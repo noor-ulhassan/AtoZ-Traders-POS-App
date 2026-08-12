@@ -50,21 +50,29 @@ export function BillingPage(): JSX.Element {
   const invoiceNo = useQuery(() => unwrap(api.sales.nextInvoiceNo()), [saved])
 
   const { totals } = bill
-  const due = round(totals.total - paidAmount)
+
+  /*
+   * A bill marked "paid in full" is paid in full by definition, so the amount
+   * received tracks the total as items are added. Holding a stale figure in
+   * state instead would leave a phantom balance the moment another item went
+   * on the bill — and that balance would disable the save button.
+   */
+  const paidNow = paymentType === 'cash' ? totals.total : paidAmount
+  const due = round(totals.total - paidNow)
 
   /* ------------------------------------------------------------ payment */
 
   const choosePaymentType = (next: PaymentType): void => {
     setPaymentType(next)
-    if (next === 'cash') setPaidAmount(totals.total)
     if (next === 'credit') setPaidAmount(0)
+    // Part payments start from whatever is already on screen, so the biller
+    // types over a sensible figure rather than a zero.
+    if (next === 'partial' && paidAmount === 0) setPaidAmount(totals.total)
   }
 
   const addProduct = async (product: Product): Promise<void> => {
     await bill.addProduct(product, bill.customer?.id ?? null)
     setProductQuery('')
-    // Cash bills are paid in full by definition, so keep the figure in step
-    // as items are added rather than making the biller retype it.
     searchRef.current?.focus()
   }
 
@@ -77,14 +85,13 @@ export function BillingPage(): JSX.Element {
 
   const save = useMutation(
     async () => {
-      const paid = paymentType === 'cash' ? totals.total : paidAmount
       const result = await unwrap(
         api.sales.create({
           customerId: bill.customer?.id ?? null,
           date,
           discount: bill.discount,
           paymentType,
-          paidAmount: paid,
+          paidAmount: paidNow,
           notes: bill.notes || null,
           items: bill.lines.map((line) => ({
             productId: line.product.id,
@@ -299,7 +306,7 @@ export function BillingPage(): JSX.Element {
                   ref={paidRef}
                   prefix={settings.currency}
                   size="lg"
-                  value={paymentType === 'cash' ? totals.total : paidAmount}
+                  value={paidNow}
                   disabled={paymentType === 'cash'}
                   onValueChange={setPaidAmount}
                 />
@@ -323,7 +330,7 @@ export function BillingPage(): JSX.Element {
               <SummaryList
                 rows={[
                   {
-                    label: paymentType === 'cash' ? 'Change to return' : 'Goes on khata',
+                    label: due > 0.005 ? 'Goes on khata' : 'Balance',
                     value: format.money(Math.max(0, due)),
                     tone: due > 0.005 ? 'bad' : undefined,
                     emphasis: true
