@@ -1,0 +1,70 @@
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+}
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.setupStep {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.setupIndex {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-weak);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-ink);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.setupDone {
+  background: var(--good-weak);
+  border-color: var(--good-border);
+  color: var(--good);
+}
+
+.setupText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.setupTitle {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.setupHint {
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+}

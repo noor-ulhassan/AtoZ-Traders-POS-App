@@ -1,0 +1,254 @@
+import type {
+  Id,
+  Page,
+  PurchaseReturn,
+  PurchaseReturnInput,
+  PurchaseReturnWithItems,
+  ReturnFilters,
+  SaleReturn,
+  SaleReturnInput,
+  SaleReturnWithItems
+} from '@shared/types'
+import { today } from '@shared/date'
+import { money, qty, sumMoney } from '@shared/money'
+import { getDb } from '../db/connection'
+import * as parties from '../repositories/partyRepository'
+import * as returns from '../repositories/returnRepository'
+import * as sales from '../repositories/saleRepository'
+import { businessRule, notFound } from '../utils/errors'
+import { recordMovement } from './inventoryService'
+import { requireParty } from './partyService'
+import { requireProduct, resolveUnit } from './productService'
+
+// ------------------------------------------------------------ sale returns
+
+export function listSaleReturns(filters: ReturnFilters = {}): Page<SaleReturn> {
+  return returns.listSaleReturns(getDb(), filters)
+}
+
+export function getSaleReturn(id: Id): SaleReturnWithItems {
+  const db = getDb()
+  const header = returns.findSaleReturn(db, id)
+  if (!header) throw notFound('Sale return')
+  return { ...header, items: returns.listSaleReturnItems(db, id) }
+}
+
+/**
+ * Goods come back: stock in, profit reversed at the cost captured on the
+ * original sale, and either cash refunded or the customer's khata reduced.
+ *
+ * When the return is linked to a sale we reuse that sale's frozen cost. That
+ * is what makes the profit reversal exact — using today's average cost would
+ * leave a phantom gain or loss behind whenever cost has moved since.
+ */
+export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
+  const db = getDb()
+
+  if (input.items.length === 0) {
+    throw businessRule('Add at least one item to the return.')
+  }
+
+  const date = input.date ?? today()
+  const saleId = input.saleId ?? null
+  let customerId = input.customerId ?? null
+
+  if (saleId != null) {
+    const sale = sales.findSale(db, saleId)
+    if (!sale) throw notFound('Sale')
+    // The return follows the original bill's customer; a mismatch would put
+    // the credit on the wrong khata.
+    customerId = sale.customerId
+  }
+
+  if (customerId != null) requireParty(db, 'customer', customerId)
+
+  if (input.refundType === 'credit' && customerId == null) {
+    throw businessRule('Adjusting the khata needs a customer. Refund in cash instead.')
+  }
+
+  const lines = input.items.map((item) => {
+    const product = requireProduct(db, item.productId)
+    const unit = resolveUnit(db, product, item.unitName)
+    const lineQty = qty(item.qty)
+    const baseQty = qty(lineQty * unit.factor)
+
+    const costPrice =
+      (saleId != null
+        ? returns.findOriginalSaleCost(db, saleId, product.id, unit.unitName)
+        : null) ?? product.costPrice
+
+    if (saleId != null) {
+      const sold = returns.soldBaseQty(db, saleId, product.id)
+      const already = returns.returnedBaseQty(db, saleId, product.id)
+      if (qty(already + baseQty) > sold) {
+        throw businessRule(
+          `Only ${qty(sold - already)} ${product.baseUnit} of "${product.name}" are left to return on this bill.`
+        )
+      }
+    }
+
+    return {
+      product,
+      unitName: unit.unitName,
+      factor: unit.factor,
+      qty: lineQty,
+      baseQty,
+      rate: money(item.rate),
+      costPrice,
+      amount: money(lineQty * item.rate)
+    }
+  })
+
+  const total = sumMoney(lines.map((line) => line.amount))
+
+  const create = db.transaction(() => {
+    const returnId = returns.insertSaleReturn(db, {
+      saleId,
+      customerId,
+      date,
+      total,
+      refundType: input.refundType,
+      notes: input.notes ?? null
+    })
+
+    for (const line of lines) {
+      returns.insertSaleReturnItem(db, {
+        saleReturnId: returnId,
+        productId: line.product.id,
+        unitName: line.unitName,
+        factor: line.factor,
+        qty: line.qty,
+        baseQty: line.baseQty,
+        rate: line.rate,
+        costPrice: line.costPrice,
+        amount: line.amount
+      })
+
+      recordMovement(db, {
+        productId: line.product.id,
+        changeQty: line.baseQty,
+        reason: 'sale_return',
+        refTable: 'sale_returns',
+        refId: returnId,
+        costPrice: line.costPrice,
+        date,
+        notes: null
+      })
+    }
+
+    // A cash refund leaves the khata alone — the money went out of the drawer.
+    if (input.refundType === 'credit' && customerId != null) {
+      parties.applyBalanceDelta(db, 'customer', customerId, -total)
+    }
+
+    return returnId
+  })
+
+  return getSaleReturn(create())
+}
+
+// -------------------------------------------------------- purchase returns
+
+export function listPurchaseReturns(filters: ReturnFilters = {}): Page<PurchaseReturn> {
+  return returns.listPurchaseReturns(getDb(), filters)
+}
+
+export function getPurchaseReturn(id: Id): PurchaseReturnWithItems {
+  const db = getDb()
+  const header = returns.findPurchaseReturn(db, id)
+  if (!header) throw notFound('Purchase return')
+  return { ...header, items: returns.listPurchaseReturnItems(db, id) }
+}
+
+/**
+ * Goods go back to the supplier: stock out and the payable reduced.
+ *
+ * Stock leaves at the current weighted-average cost by default, which keeps
+ * the average unchanged — the correct behaviour when returning goods that
+ * were bought at that average. An explicitly different cost is recorded on
+ * the line but still does not re-derive the average; rebuilding an average
+ * backwards from a partial return is guesswork, and a stock adjustment is the
+ * honest tool for correcting a cost that is genuinely wrong.
+ */
+export function createPurchaseReturn(input: PurchaseReturnInput): PurchaseReturnWithItems {
+  const db = getDb()
+
+  if (input.items.length === 0) {
+    throw businessRule('Add at least one item to the return.')
+  }
+
+  const date = input.date ?? today()
+  const purchaseId = input.purchaseId ?? null
+  const supplierId = input.supplierId ?? null
+  if (supplierId != null) requireParty(db, 'supplier', supplierId)
+
+  const lines = input.items.map((item) => {
+    const product = requireProduct(db, item.productId)
+    const unit = resolveUnit(db, product, item.unitName)
+    const lineQty = qty(item.qty)
+    const baseQty = qty(lineQty * unit.factor)
+
+    const costPerBase =
+      item.unitCost != null ? money(item.unitCost / unit.factor) : product.costPrice
+
+    if (baseQty > qty(product.stockQty)) {
+      throw businessRule(
+        `Only ${product.stockQty} ${product.baseUnit} of "${product.name}" are in stock; the return needs ${baseQty}.`
+      )
+    }
+
+    return {
+      product,
+      unitName: unit.unitName,
+      factor: unit.factor,
+      qty: lineQty,
+      baseQty,
+      costPerBase,
+      amount: money(baseQty * costPerBase)
+    }
+  })
+
+  const total = sumMoney(lines.map((line) => line.amount))
+
+  const create = db.transaction(() => {
+    const returnId = returns.insertPurchaseReturn(db, {
+      purchaseId,
+      supplierId,
+      date,
+      total,
+      notes: input.notes ?? null
+    })
+
+    for (const line of lines) {
+      returns.insertPurchaseReturnItem(db, {
+        purchaseReturnId: returnId,
+        productId: line.product.id,
+        unitName: line.unitName,
+        factor: line.factor,
+        qty: line.qty,
+        baseQty: line.baseQty,
+        costPrice: line.costPerBase,
+        amount: line.amount
+      })
+
+      recordMovement(db, {
+        productId: line.product.id,
+        changeQty: -line.baseQty,
+        reason: 'purchase_return',
+        refTable: 'purchase_returns',
+        refId: returnId,
+        costPrice: line.costPerBase,
+        date,
+        notes: null
+      })
+    }
+
+    if (supplierId != null) {
+      parties.applyBalanceDelta(db, 'supplier', supplierId, -total)
+    }
+
+    return returnId
+  })
+
+  return getPurchaseReturn(create())
+}

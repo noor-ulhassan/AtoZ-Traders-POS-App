@@ -1,74 +1,74 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import { app, BrowserWindow, dialog } from 'electron'
+import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { bootstrapDatabase } from './app/bootstrap'
+import { createMainWindow } from './app/window'
+import { closeDatabase } from './db/connection'
+import { registerIpcHandlers } from './ipc'
+import { runAutoBackup } from './services/backupService'
+import { logger } from './utils/logger'
 
-function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+const log = logger.child('main')
+
+// A second instance would open a second connection to the same SQLite file and
+// let the owner bill from two windows with two different in-memory ideas of
+// stock. One instance only; a second launch focuses the existing window.
+const hasLock = app.requestSingleInstanceLock()
+if (!hasLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const [window] = BrowserWindow.getAllWindows()
+    if (!window) return
+    if (window.isMinimized()) window.restore()
+    window.focus()
+  })
+
+  app.whenReady().then(() => {
+    electronApp.setAppUserModelId('com.atoztraders.pos')
+
+    app.on('browser-window-created', (_event, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    try {
+      bootstrapDatabase()
+      registerIpcHandlers()
+    } catch (error) {
+      log.error('startup failed', error)
+      dialog.showErrorBox(
+        'The app could not start',
+        `${(error as Error).message}\n\nYour data has not been changed. Restore a backup from the Settings screen of a working installation, or contact support.`
+      )
+      app.exit(1)
+      return
     }
-  })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
+    createMainWindow()
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    })
   })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+let shuttingDown = false
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
-  createWindow()
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+app.on('before-quit', () => {
+  if (shuttingDown) return
+  shuttingDown = true
+  runAutoBackup()
+  closeDatabase()
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  if (process.platform !== 'darwin') app.quit()
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+// A crash mid-transaction must not leave the WAL unflushed.
+process.on('uncaughtException', (error) => {
+  log.error('uncaught exception', error)
+})
+
+process.on('unhandledRejection', (reason) => {
+  log.error('unhandled rejection', reason)
+})

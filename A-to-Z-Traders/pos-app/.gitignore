@@ -1,8 +1,14 @@
 node_modules
 dist
 out
+release
 .DS_Store
 .eslintcache
 *.log*
 .env
 SRS.docx
+Guide.md
+
+# Compiled better-sqlite3 bindings, one per ABI. Rebuilt on demand by
+# scripts/native-abi.mjs — machine-specific, never committed.
+.native-cache

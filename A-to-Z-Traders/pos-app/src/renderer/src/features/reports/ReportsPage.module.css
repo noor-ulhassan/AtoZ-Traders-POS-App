@@ -1,0 +1,151 @@
+.tabs {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.tab {
+  height: 32px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--ink-muted);
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.tab:last-child {
+  border-right: none;
+}
+
+.tab:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.tabActive,
+.tabActive:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* The P&L statement: label on the left, amount on the right, with the two
+   result lines set apart so the eye lands on them. */
+.statement {
+  display: flex;
+  flex-direction: column;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.line + .line {
+  border-top: 1px solid var(--line);
+}
+
+.lineLabel {
+  color: var(--ink-muted);
+}
+
+.lineValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.indent .lineLabel {
+  padding-left: var(--space-4);
+  color: var(--ink-subtle);
+  font-size: var(--text-caption);
+}
+
+.result {
+  background: var(--surface-sunken);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-top: 1px solid var(--line-strong);
+}
+
+.result .lineLabel {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.result .lineValue {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.netProfit {
+  background: var(--accent-weak);
+  border-top: 1px solid var(--accent-border);
+  border-bottom: 1px solid var(--accent-border);
+}
+
+.netProfit .lineLabel,
+.netProfit .lineValue {
+  color: var(--accent-ink);
+}
+
+.netProfit .lineValue {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.negative {
+  color: var(--bad);
+}
+
+.positive {
+  color: var(--good);
+}
+
+.note {
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-caption);
+  color: var(--ink-subtle);
+  border-top: 1px solid var(--line);
+  line-height: var(--leading-normal);
+}
+
+/* A proportion bar used in the category and expense breakdowns. */
+.barCell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.barTrack {
+  flex: 1;
+  height: 6px;
+  min-width: 40px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}

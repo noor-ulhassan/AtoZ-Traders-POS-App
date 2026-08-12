@@ -1,0 +1,65 @@
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-subtle);
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.currency {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--ink-subtle);
+}
+
+.value {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.good {
+  color: var(--good);
+}
+
+.bad {
+  color: var(--bad);
+}
+
+.footnote {
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+}
+
+/* A tile that carries a severity, e.g. items below reorder level. */
+.attention {
+  border-color: var(--warn-border);
+  background: var(--warn-weak);
+}
+
+.attention .label {
+  color: var(--warn);
+}

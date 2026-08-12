@@ -1,43 +1,71 @@
-appId: com.electron.app
-productName: pos-app
+appId: com.atoztraders.pos
+productName: Wholesale POS
+copyright: Copyright © A to Z Traders
+
 directories:
   buildResources: build
+  output: release
+
+# Only what the app needs at runtime is packaged. Source, tests, tooling and
+# the two cached native bindings are all excluded — the installer ships the
+# built `out/` bundle plus the production dependencies.
 files:
+  - out/**
+  - package.json
   - '!**/.vscode/*'
   - '!src/*'
+  - '!test/*'
+  - '!scripts/*'
+  - '!.native-cache/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!vitest.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,Guide.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+
 asarUnpack:
   - resources/**
+  # A native module cannot be loaded from inside an asar archive.
+  - '**/*.node'
+
 win:
-  executableName: pos-app
+  executableName: WholesalePOS
+  target:
+    - target: nsis
+      arch: [x64]
+
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  # The shop owner installs this themselves on one machine; a per-user install
+  # avoids the UAC prompt and keeps the data directory with the account that
+  # actually uses the till.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  # Uninstalling must never take the shop's records with it — pos.db lives in
+  # userData and is deliberately left in place.
+  deleteAppDataOnUninstall: false
+
 mac:
+  category: public.app-category.business
   entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+
 dmg:
   artifactName: ${name}-${version}.${ext}
+
 linux:
   target:
     - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
+  maintainer: A to Z Traders
+  category: Office
+
 appImage:
   artifactName: ${name}-${version}.${ext}
+
+# Native dependencies are rebuilt by the `postinstall` hook, not during
+# packaging — rebuilding here would fight the ABI cache in scripts/native-abi.
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

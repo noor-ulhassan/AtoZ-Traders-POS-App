@@ -1,0 +1,329 @@
+import type {
+  CategoryProfitRow,
+  DateRange,
+  LowStockRow,
+  NamedAmount,
+  ProductProfitRow,
+  ProfitLossReport,
+  SalesSummaryPoint,
+  SalesSummaryReport,
+  StockValuationReport,
+  StockValuationRow
+} from '@shared/types'
+import { eachDay } from '@shared/date'
+import { money, qty } from '@shared/money'
+import type { Db } from '../db/connection'
+import { getDb } from '../db/connection'
+
+type RangeParams = { from: string; to: string }
+
+function scalar(db: Db, sql: string, params: RangeParams): number {
+  const row = db.prepare<RangeParams, { value: number | null }>(sql).get(params)
+  return money(row?.value ?? 0)
+}
+
+/**
+ * Profit & loss (Guide §6.9).
+ *
+ * Revenue is measured from sale lines, which are already net of line
+ * discounts. The bill-level discount is subtracted once, as a flat deduction
+ * from gross sales rather than spread across lines — the documented
+ * convention from Guide §4. Tax collected is never treated as revenue: it is
+ * money held for the government, not earned.
+ */
+export function profitAndLoss(range: DateRange): ProfitLossReport {
+  const db = getDb()
+  const params: RangeParams = { from: range.from, to: range.to }
+
+  const grossSales = scalar(
+    db,
+    'SELECT SUM(subtotal) AS value FROM sales WHERE date BETWEEN @from AND @to',
+    params
+  )
+  const billDiscounts = scalar(
+    db,
+    'SELECT SUM(discount) AS value FROM sales WHERE date BETWEEN @from AND @to',
+    params
+  )
+  const taxCollected = scalar(
+    db,
+    'SELECT SUM(tax) AS value FROM sales WHERE date BETWEEN @from AND @to',
+    params
+  )
+  const billCount = Math.round(
+    scalar(db, 'SELECT COUNT(*) AS value FROM sales WHERE date BETWEEN @from AND @to', params)
+  )
+  const cogs = scalar(
+    db,
+    `SELECT SUM(si.cost_price * si.base_qty) AS value
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id
+      WHERE s.date BETWEEN @from AND @to`,
+    params
+  )
+  const salesReturns = scalar(
+    db,
+    'SELECT SUM(total) AS value FROM sale_returns WHERE date BETWEEN @from AND @to',
+    params
+  )
+  const returnedCogs = scalar(
+    db,
+    `SELECT SUM(i.cost_price * i.base_qty) AS value
+       FROM sale_return_items i
+       JOIN sale_returns r ON r.id = i.sale_return_id
+      WHERE r.date BETWEEN @from AND @to`,
+    params
+  )
+  const expenses = scalar(
+    db,
+    'SELECT SUM(amount) AS value FROM expenses WHERE date BETWEEN @from AND @to',
+    params
+  )
+
+  const netSales = money(grossSales - billDiscounts - salesReturns)
+  const netCogs = money(cogs - returnedCogs)
+  const grossProfit = money(netSales - netCogs)
+  const netProfit = money(grossProfit - expenses)
+
+  const expenseBreakdown = db
+    .prepare<RangeParams, { name: string | null; amount: number }>(
+      `SELECT COALESCE(ec.name, 'Uncategorised') AS name, SUM(e.amount) AS amount
+         FROM expenses e
+         LEFT JOIN expense_categories ec ON ec.id = e.category_id
+        WHERE e.date BETWEEN @from AND @to
+        GROUP BY ec.id
+        ORDER BY amount DESC`
+    )
+    .all(params)
+    .map<NamedAmount>((row) => ({ name: row.name ?? 'Uncategorised', amount: money(row.amount) }))
+
+  const categoryBreakdown = db
+    .prepare<
+      RangeParams,
+      { category_id: number | null; category_name: string | null; revenue: number; cogs: number }
+    >(
+      `SELECT c.id AS category_id,
+              COALESCE(c.name, 'Uncategorised') AS category_name,
+              SUM(si.amount) AS revenue,
+              SUM(si.cost_price * si.base_qty) AS cogs
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         JOIN products p ON p.id = si.product_id
+         LEFT JOIN categories c ON c.id = p.category_id
+        WHERE s.date BETWEEN @from AND @to
+        GROUP BY c.id
+        ORDER BY revenue DESC`
+    )
+    .all(params)
+    .map<CategoryProfitRow>((row) => ({
+      categoryId: row.category_id,
+      categoryName: row.category_name ?? 'Uncategorised',
+      revenue: money(row.revenue),
+      cogs: money(row.cogs),
+      profit: money(row.revenue - row.cogs)
+    }))
+
+  return {
+    range,
+    grossSales,
+    billDiscounts,
+    salesReturns,
+    netSales,
+    cogs,
+    returnedCogs,
+    netCogs,
+    grossProfit,
+    expenses,
+    netProfit,
+    taxCollected,
+    billCount,
+    expenseBreakdown,
+    categoryBreakdown
+  }
+}
+
+export function productProfit(range: DateRange, limit = 500): ProductProfitRow[] {
+  const db = getDb()
+  return db
+    .prepare<
+      { from: string; to: string; limit: number },
+      {
+        product_id: number
+        product_name: string
+        category_name: string | null
+        base_qty: number
+        revenue: number
+        cogs: number
+      }
+    >(
+      `SELECT si.product_id       AS product_id,
+              p.name              AS product_name,
+              c.name              AS category_name,
+              SUM(si.base_qty)    AS base_qty,
+              SUM(si.amount)      AS revenue,
+              SUM(si.cost_price * si.base_qty) AS cogs
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         JOIN products p ON p.id = si.product_id
+         LEFT JOIN categories c ON c.id = p.category_id
+        WHERE s.date BETWEEN @from AND @to
+        GROUP BY si.product_id
+        ORDER BY revenue DESC
+        LIMIT @limit`
+    )
+    .all({ from: range.from, to: range.to, limit })
+    .map((row) => {
+      const revenue = money(row.revenue)
+      const cogs = money(row.cogs)
+      const profit = money(revenue - cogs)
+      return {
+        productId: row.product_id,
+        productName: row.product_name,
+        categoryName: row.category_name,
+        baseQtySold: qty(row.base_qty),
+        revenue,
+        cogs,
+        profit,
+        marginPercent: revenue === 0 ? 0 : money((profit / revenue) * 100)
+      }
+    })
+}
+
+export function salesSummary(range: DateRange): SalesSummaryReport {
+  const db = getDb()
+  const params: RangeParams = { from: range.from, to: range.to }
+
+  const rows = db
+    .prepare<
+      RangeParams,
+      { date: string; sales: number; bill_count: number; cogs: number; discount: number }
+    >(
+      `SELECT s.date                            AS date,
+              SUM(s.total)                      AS sales,
+              COUNT(DISTINCT s.id)              AS bill_count,
+              COALESCE(SUM(line.cogs), 0)       AS cogs,
+              SUM(s.discount)                   AS discount
+         FROM sales s
+         LEFT JOIN (
+              SELECT sale_id, SUM(cost_price * base_qty) AS cogs
+                FROM sale_items GROUP BY sale_id
+         ) line ON line.sale_id = s.id
+        WHERE s.date BETWEEN @from AND @to
+        GROUP BY s.date
+        ORDER BY s.date`
+    )
+    .all(params)
+
+  const byDate = new Map<string, SalesSummaryPoint>()
+  for (const row of rows) {
+    byDate.set(row.date, {
+      date: row.date,
+      sales: money(row.sales),
+      // Profit per day mirrors the P&L definition minus returns and expenses,
+      // which are not per-bill figures.
+      profit: money(row.sales - row.cogs),
+      billCount: row.bill_count
+    })
+  }
+
+  // Days with no sales still belong on the chart — a flat line is information.
+  const daily = eachDay(range).map<SalesSummaryPoint>(
+    (date) => byDate.get(date) ?? { date, sales: 0, profit: 0, billCount: 0 }
+  )
+
+  const totalSales = money(daily.reduce((sum, point) => sum + point.sales, 0))
+  const totalProfit = money(daily.reduce((sum, point) => sum + point.profit, 0))
+  const billCount = daily.reduce((sum, point) => sum + point.billCount, 0)
+
+  return {
+    range,
+    totalSales,
+    totalProfit,
+    billCount,
+    averageBill: billCount === 0 ? 0 : money(totalSales / billCount),
+    daily,
+    topProducts: productProfit(range, 10)
+  }
+}
+
+export function stockValuation(): StockValuationReport {
+  const db = getDb()
+  const rows = db
+    .prepare<
+      [],
+      {
+        id: number
+        name: string
+        sku: string | null
+        category_name: string | null
+        base_unit: string
+        stock_qty: number
+        cost_price: number
+        sale_price: number
+      }
+    >(
+      `SELECT p.id, p.name, p.sku, c.name AS category_name, p.base_unit,
+              p.stock_qty, p.cost_price, p.sale_price
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+        WHERE p.is_active = 1
+        ORDER BY p.name COLLATE NOCASE`
+    )
+    .all()
+    .map<StockValuationRow>((row) => ({
+      productId: row.id,
+      productName: row.name,
+      sku: row.sku,
+      categoryName: row.category_name,
+      baseUnit: row.base_unit,
+      stockQty: qty(row.stock_qty),
+      costPrice: row.cost_price,
+      salePrice: row.sale_price,
+      stockValue: money(row.stock_qty * row.cost_price),
+      retailValue: money(row.stock_qty * row.sale_price)
+    }))
+
+  const totalStockValue = money(rows.reduce((sum, row) => sum + row.stockValue, 0))
+  const totalRetailValue = money(rows.reduce((sum, row) => sum + row.retailValue, 0))
+
+  return {
+    rows,
+    totalStockValue,
+    totalRetailValue,
+    potentialProfit: money(totalRetailValue - totalStockValue)
+  }
+}
+
+export function lowStock(): LowStockRow[] {
+  const db = getDb()
+  return db
+    .prepare<
+      [],
+      {
+        id: number
+        name: string
+        sku: string | null
+        category_name: string | null
+        base_unit: string
+        stock_qty: number
+        reorder_level: number
+      }
+    >(
+      `SELECT p.id, p.name, p.sku, c.name AS category_name, p.base_unit, p.stock_qty, p.reorder_level
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+        WHERE p.is_active = 1 AND p.reorder_level > 0 AND p.stock_qty <= p.reorder_level
+        ORDER BY (p.stock_qty - p.reorder_level) ASC, p.name COLLATE NOCASE`
+    )
+    .all()
+    .map((row) => ({
+      productId: row.id,
+      productName: row.name,
+      sku: row.sku,
+      categoryName: row.category_name,
+      baseUnit: row.base_unit,
+      stockQty: qty(row.stock_qty),
+      reorderLevel: qty(row.reorder_level),
+      shortfall: qty(Math.max(0, row.reorder_level - row.stock_qty))
+    }))
+}

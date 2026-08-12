@@ -1,0 +1,115 @@
+.scroller {
+  width: 100%;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-sunken);
+  padding: 0 var(--space-4);
+  height: 34px;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.table tbody td {
+  padding: 0 var(--space-4);
+  height: var(--row-height);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr.clickable {
+  cursor: pointer;
+}
+
+.table tbody tr.clickable:hover td {
+  background: var(--surface-hover);
+}
+
+.table tbody tr.selected td {
+  background: var(--accent-weak);
+}
+
+/* Numeric columns are right-aligned and share one digit width so the decimal
+   points form a straight edge down the column. */
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.center {
+  text-align: center;
+}
+
+/* Secondary information inside a cell: SKU under a product name, and so on. */
+.muted {
+  color: var(--ink-muted);
+}
+
+.primaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-1) 0;
+  line-height: 1.35;
+}
+
+.primaryCell strong {
+  font-weight: 500;
+}
+
+.primaryCell span {
+  font-size: var(--text-caption);
+  color: var(--ink-subtle);
+}
+
+.actionsCell {
+  display: flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+
+/* Totals row pinned to the bottom of a table. */
+.table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--line-strong);
+  height: var(--row-height);
+  padding: 0 var(--space-4);
+  font-weight: 600;
+}
+
+.empty {
+  padding: var(--space-12) var(--space-6);
+}
+
+.loadingRow td {
+  color: var(--ink-subtle);
+  text-align: center;
+  height: 96px;
+}
+
+.compact tbody td,
+.compact thead th {
+  height: 32px;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}

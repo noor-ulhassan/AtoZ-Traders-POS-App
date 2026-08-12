@@ -1,0 +1,222 @@
+/* ==========================================================================
+   Design tokens
+   --------------------------------------------------------------------------
+   Every colour, size and radius in the app resolves through a token defined
+   here. Components never hard-code a hex value — that is what makes the dark
+   palette below a single block rather than an audit of every stylesheet.
+
+   Palette: cool paper and ink, with a deep steel-blue accent. Semantic
+   colours (money in, money due, attention) are deliberately separate from the
+   accent so "this needs your attention" never reads as "this is selected".
+   ========================================================================== */
+
+:root {
+  /* ---- neutrals: grey with a slight blue bias, to sit under the accent */
+  --paper: #ffffff;
+  --canvas: #f4f5f7;
+  --surface-sunken: #eef0f3;
+  --surface-raised: #ffffff;
+  --surface-hover: #f3f5f7;
+  --surface-active: #e9edf1;
+
+  --line: #e0e3e8;
+  --line-strong: #cbd1d9;
+
+  --ink: #14181d;
+  --ink-muted: #5b6572;
+  --ink-subtle: #7d8794;
+  --ink-inverse: #ffffff;
+
+  /* ---- accent */
+  --accent: #14648a;
+  --accent-strong: #10506d;
+  --accent-weak: #e8f1f6;
+  --accent-border: #b9d5e4;
+  --accent-ink: #0d4560;
+
+  /* ---- semantic: money and state */
+  --good: #1c6b46;
+  --good-weak: #e7f2ec;
+  --good-border: #b6d8c6;
+
+  --bad: #a52f24;
+  --bad-weak: #fbeceb;
+  --bad-border: #eec6c2;
+
+  --warn: #8a5a09;
+  --warn-weak: #fcf3e2;
+  --warn-border: #ecd7a8;
+
+  --info: #2c5282;
+  --info-weak: #eaf0f8;
+
+  /* ---- sidebar: a darker ground so the workspace reads as the bright half */
+  --nav-bg: #16202b;
+  --nav-ink: #b8c4d0;
+  --nav-ink-strong: #ffffff;
+  --nav-ink-muted: #74849a;
+  --nav-hover: #1e2b3a;
+  --nav-active: #24384c;
+  --nav-line: #26333f;
+
+  /* ---- focus */
+  --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
+  --focus-ring-tight: 0 0 0 2px var(--accent);
+
+  /* ---- elevation: reserved for things that float above the page */
+  --shadow-popover: 0 4px 12px rgb(16 24 32 / 10%), 0 1px 3px rgb(16 24 32 / 8%);
+  --shadow-modal: 0 16px 48px rgb(16 24 32 / 18%), 0 2px 8px rgb(16 24 32 / 10%);
+
+  /* ---- spacing: 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---- radii */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  /* ---- type */
+  --font-ui:
+    'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --font-display:
+    'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, 'Courier New', monospace;
+
+  --text-micro: 11px;
+  --text-caption: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 34px;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  /* ---- layout */
+  --sidebar-width: 232px;
+  --header-height: 60px;
+  --row-height: 38px;
+
+  color-scheme: light;
+}
+
+/* Dark palette. Applies when the OS asks for dark and the user has not
+   explicitly chosen light. Only tokens are redefined — no component rule
+   lives inside this block. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #171b21;
+    --canvas: #101317;
+    --surface-sunken: #1c2129;
+    --surface-raised: #1c2129;
+    --surface-hover: #20262f;
+    --surface-active: #262e38;
+
+    --line: #2a313a;
+    --line-strong: #3a434f;
+
+    --ink: #e8ecf1;
+    --ink-muted: #9aa5b3;
+    --ink-subtle: #78838f;
+    --ink-inverse: #101317;
+
+    --accent: #4fa3cd;
+    --accent-strong: #6bb6da;
+    --accent-weak: #16303d;
+    --accent-border: #2b5468;
+    --accent-ink: #9ed0e8;
+
+    --good: #58b487;
+    --good-weak: #14291f;
+    --good-border: #2a4a38;
+
+    --bad: #e0796d;
+    --bad-weak: #2c1917;
+    --bad-border: #543029;
+
+    --warn: #d5a44e;
+    --warn-weak: #2a2115;
+    --warn-border: #4d3d1f;
+
+    --info: #7aa4d8;
+    --info-weak: #182433;
+
+    --nav-bg: #0b0e12;
+    --nav-ink: #98a5b4;
+    --nav-ink-strong: #f2f5f8;
+    --nav-ink-muted: #5d6b7c;
+    --nav-hover: #161b22;
+    --nav-active: #1e2732;
+    --nav-line: #1c232c;
+
+    --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
+
+    --shadow-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
+    --shadow-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
+
+    color-scheme: dark;
+  }
+}
+
+/* An explicit dark choice wins over a light OS. */
+:root[data-theme='dark'] {
+  --paper: #171b21;
+  --canvas: #101317;
+  --surface-sunken: #1c2129;
+  --surface-raised: #1c2129;
+  --surface-hover: #20262f;
+  --surface-active: #262e38;
+
+  --line: #2a313a;
+  --line-strong: #3a434f;
+
+  --ink: #e8ecf1;
+  --ink-muted: #9aa5b3;
+  --ink-subtle: #78838f;
+  --ink-inverse: #101317;
+
+  --accent: #4fa3cd;
+  --accent-strong: #6bb6da;
+  --accent-weak: #16303d;
+  --accent-border: #2b5468;
+  --accent-ink: #9ed0e8;
+
+  --good: #58b487;
+  --good-weak: #14291f;
+  --good-border: #2a4a38;
+
+  --bad: #e0796d;
+  --bad-weak: #2c1917;
+  --bad-border: #543029;
+
+  --warn: #d5a44e;
+  --warn-weak: #2a2115;
+  --warn-border: #4d3d1f;
+
+  --info: #7aa4d8;
+  --info-weak: #182433;
+
+  --nav-bg: #0b0e12;
+  --nav-ink: #98a5b4;
+  --nav-ink-strong: #f2f5f8;
+  --nav-ink-muted: #5d6b7c;
+  --nav-hover: #161b22;
+  --nav-active: #1e2732;
+  --nav-line: #1c232c;
+
+  --shadow-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
+  --shadow-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
+
+  color-scheme: dark;
+}

@@ -1,12 +1,17 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Electron</title>
-    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <title>Wholesale POS</title>
+    <!--
+      The renderer loads nothing from the network: no CDN scripts, no remote
+      fonts, no images from the web. Locking the CSP down to 'self' means a
+      future dependency cannot quietly start phoning home from a shop machine.
+      `img-src` allows file: so a business logo picked from disk can render.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
   </head>
 

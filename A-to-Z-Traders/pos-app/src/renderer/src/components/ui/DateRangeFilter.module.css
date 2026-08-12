@@ -1,0 +1,65 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Segmented control: one bordered group, dividers between segments. */
+.segments {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.segment {
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--ink-muted);
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.segment:last-child {
+  border-right: none;
+}
+
+.segment:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.segmentActive,
+.segmentActive:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.custom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+}
+
+.dateInput {
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.dateInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+  outline: none;
+}

@@ -1,0 +1,168 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.required::after {
+  content: '*';
+  margin-left: 2px;
+  color: var(--bad);
+}
+
+.hint {
+  font-size: var(--text-caption);
+  color: var(--ink-subtle);
+}
+
+.error {
+  font-size: var(--text-caption);
+  color: var(--bad);
+}
+
+/* ---- controls share one shell so a row of mixed inputs lines up exactly */
+.control {
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-3);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.control::placeholder {
+  color: var(--ink-subtle);
+}
+
+.control:hover:not(:disabled):not(:focus) {
+  border-color: var(--ink-subtle);
+}
+
+.control:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+  outline: none;
+}
+
+.control:disabled {
+  background: var(--surface-sunken);
+  color: var(--ink-subtle);
+  cursor: not-allowed;
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--bad);
+}
+
+.control[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--bad-weak);
+}
+
+.textarea {
+  height: auto;
+  min-height: 72px;
+  padding: var(--space-2) var(--space-3);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.large {
+  height: 42px;
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+/* ---- select: native element, custom chevron */
+.selectWrap {
+  position: relative;
+  display: flex;
+}
+
+.select {
+  appearance: none;
+  padding-right: var(--space-8);
+  cursor: pointer;
+}
+
+.selectChevron {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-subtle);
+  pointer-events: none;
+}
+
+/* ---- search */
+.searchWrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-subtle);
+  pointer-events: none;
+}
+
+.search {
+  padding-left: 32px;
+}
+
+/* ---- checkbox */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ---- inline prefix, e.g. a currency code inside the control */
+.prefixWrap {
+  position: relative;
+  display: flex;
+}
+
+.prefix {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--text-caption);
+  color: var(--ink-subtle);
+  pointer-events: none;
+}
+
+.withPrefix {
+  padding-left: 42px;
+}

@@ -1,0 +1,177 @@
+import type { JSX } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import type { DateRange, Purchase } from '@shared/types'
+import { resolvePreset } from '@shared/date'
+import { Button } from '../../components/ui/Button'
+import { SearchInput } from '../../components/ui/Field'
+import { Badge, ToneValue } from '../../components/ui/Feedback'
+import { Card, CardBody } from '../../components/ui/Surface'
+import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
+import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
+import { StatTile } from '../../components/ui/StatTile'
+import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
+import { useDebounced } from '../../hooks/useDebounced'
+import { useMutation } from '../../hooks/useMutation'
+import { useQuery } from '../../hooks/useQuery'
+import { api, unwrap } from '../../lib/api'
+import * as format from '../../lib/format'
+import { useCurrency } from '../../app/SettingsContext'
+import { PurchaseDetailModal } from './PurchaseDetailModal'
+import styles from './PurchasesPage.module.css'
+
+export function PurchasesPage(): JSX.Element {
+  const currency = useCurrency()
+  const navigate = useNavigate()
+
+  const [range, setRange] = useState<DateRange>(() => resolvePreset('last30'))
+  const [search, setSearch] = useState('')
+  const [openId, setOpenId] = useState<number | null>(null)
+
+  const debouncedSearch = useDebounced(search)
+
+  const purchases = useQuery(
+    () =>
+      unwrap(
+        api.purchases.list({
+          from: range.from,
+          to: range.to,
+          search: debouncedSearch || undefined,
+          limit: 300
+        })
+      ),
+    [range.from, range.to, debouncedSearch]
+  )
+
+  const exportCsv = useMutation(
+    async () =>
+      unwrap(api.exports.csv({ report: 'purchases', filters: { from: range.from, to: range.to } })),
+    { successMessage: 'Purchases exported', errorTitle: 'Export failed' }
+  )
+
+  const rows = purchases.data?.rows ?? []
+  const total = rows.reduce((sum, row) => sum + row.total, 0)
+  const unpaid = rows.reduce((sum, row) => sum + Math.max(0, row.total - row.paidAmount), 0)
+
+  const columns: Column<Purchase>[] = [
+    { key: 'date', header: 'Date', width: '120px', render: (row) => format.date(row.date) },
+    {
+      key: 'supplier',
+      header: 'Supplier',
+      render: (row) => (
+        <PrimaryCell
+          title={row.supplierName ?? 'No supplier'}
+          subtitle={row.invoiceNo ? `Invoice ${row.invoiceNo}` : undefined}
+        />
+      )
+    },
+    {
+      key: 'total',
+      header: `Total (${currency})`,
+      numeric: true,
+      width: '140px',
+      render: (row) => format.money(row.total)
+    },
+    {
+      key: 'paid',
+      header: `Paid (${currency})`,
+      numeric: true,
+      width: '140px',
+      render: (row) => format.money(row.paidAmount)
+    },
+    {
+      key: 'balance',
+      header: `Owing (${currency})`,
+      numeric: true,
+      width: '140px',
+      render: (row) => {
+        const balance = row.total - row.paidAmount
+        return balance > 0.005 ? (
+          <ToneValue tone="bad">{format.money(balance)}</ToneValue>
+        ) : (
+          <span style={{ color: 'var(--ink-subtle)' }}>—</span>
+        )
+      }
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '120px',
+      render: (row) => {
+        const balance = row.total - row.paidAmount
+        if (balance <= 0.005) return <Badge tone="good">Paid</Badge>
+        if (row.paidAmount > 0) return <Badge tone="warn">Part paid</Badge>
+        return <Badge tone="bad">Unpaid</Badge>
+      }
+    }
+  ]
+
+  return (
+    <>
+      <PageHeader
+        title="Purchases"
+        subtitle="Stock coming in, and what is still owed for it"
+        actions={
+          <>
+            <Button
+              icon="download"
+              loading={exportCsv.isPending}
+              onClick={() => void exportCsv.run()}
+            >
+              Export
+            </Button>
+            <Button variant="primary" icon="plus" onClick={() => navigate('/purchases/new')}>
+              Record purchase
+            </Button>
+          </>
+        }
+      />
+
+      <FilterBar>
+        <DateRangeFilter value={range} onChange={setRange} />
+        <SearchInput
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search by supplier or invoice number"
+        />
+        <FilterSpacer />
+      </FilterBar>
+
+      <PageBody>
+        <div className={styles.tiles}>
+          <StatTile label="Purchases in period" unit={currency} value={format.money(total)} />
+          <StatTile
+            label="Still owed on these"
+            unit={currency}
+            value={format.money(unpaid)}
+            tone={unpaid > 0 ? 'bad' : 'default'}
+          />
+          <StatTile label="Bills recorded" value={rows.length} />
+        </div>
+
+        <Card>
+          <CardBody flush>
+            <DataTable
+              columns={columns}
+              rows={rows}
+              rowKey={(row) => row.id}
+              isLoading={purchases.isLoading}
+              onRowClick={(row) => setOpenId(row.id)}
+              empty={{
+                title: 'No purchases in this period',
+                description: 'Record a purchase to bring stock in and update your average cost.',
+                action: (
+                  <Button variant="primary" icon="plus" onClick={() => navigate('/purchases/new')}>
+                    Record purchase
+                  </Button>
+                )
+              }}
+            />
+          </CardBody>
+        </Card>
+      </PageBody>
+
+      <PurchaseDetailModal purchaseId={openId} onClose={() => setOpenId(null)} />
+    </>
+  )
+}

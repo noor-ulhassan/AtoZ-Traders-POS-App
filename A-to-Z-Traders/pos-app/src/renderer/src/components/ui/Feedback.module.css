@@ -1,0 +1,129 @@
+/* ---- Badge: state encoded as shape and colour, not colour alone */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.neutral {
+  background: var(--surface-sunken);
+  border-color: var(--line);
+  color: var(--ink-muted);
+}
+
+.good {
+  background: var(--good-weak);
+  border-color: var(--good-border);
+  color: var(--good);
+}
+
+.bad {
+  background: var(--bad-weak);
+  border-color: var(--bad-border);
+  color: var(--bad);
+}
+
+.warn {
+  background: var(--warn-weak);
+  border-color: var(--warn-border);
+  color: var(--warn);
+}
+
+.accent {
+  background: var(--accent-weak);
+  border-color: var(--accent-border);
+  color: var(--accent-ink);
+}
+
+/* ---- Callout: an inline message block inside a form or panel */
+.callout {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.calloutIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.calloutBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.calloutTitle {
+  font-weight: 600;
+}
+
+.calloutInfo {
+  background: var(--info-weak);
+  border-color: var(--accent-border);
+  color: var(--ink);
+}
+
+.calloutWarn {
+  background: var(--warn-weak);
+  border-color: var(--warn-border);
+  color: var(--ink);
+}
+
+.calloutBad {
+  background: var(--bad-weak);
+  border-color: var(--bad-border);
+  color: var(--ink);
+}
+
+/* ---- EmptyState */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.emptyTitle {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.emptyDescription {
+  font-size: var(--text-sm);
+  max-width: 44ch;
+}
+
+.emptyAction {
+  margin-top: var(--space-3);
+}
+
+/* ---- inline value tones, for balances in tables */
+.toneGood {
+  color: var(--good);
+  font-weight: 500;
+}
+
+.toneBad {
+  color: var(--bad);
+  font-weight: 500;
+}
+
+.toneNeutral {
+  color: var(--ink-subtle);
+}

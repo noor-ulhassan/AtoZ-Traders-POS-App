@@ -1,0 +1,154 @@
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: var(--nav-bg);
+  color: var(--nav-ink);
+  border-right: 1px solid var(--nav-line);
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--nav-line);
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--nav-ink-strong);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brandMeta {
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nav-ink-muted);
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-3) var(--space-5);
+}
+
+.group + .group {
+  margin-top: var(--space-4);
+}
+
+.groupLabel {
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nav-ink-muted);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--nav-ink);
+  text-decoration: none;
+  position: relative;
+}
+
+.item:hover {
+  background: var(--nav-hover);
+  color: var(--nav-ink-strong);
+  text-decoration: none;
+}
+
+.itemActive,
+.itemActive:hover {
+  background: var(--nav-active);
+  color: var(--nav-ink-strong);
+  font-weight: 500;
+}
+
+/* A rail on the active item, so the current screen is findable without
+   relying on the background alone. */
+.itemActive::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--space-3) * -1);
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.itemIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.itemLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemHint {
+  font-size: var(--text-micro);
+  font-family: var(--font-mono);
+  color: var(--nav-ink-muted);
+}
+
+.sidebarFooter {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--nav-line);
+  font-size: var(--text-micro);
+  color: var(--nav-ink-muted);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ main */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+/* The page header is full-bleed and sticks to the top of the work area, so
+   the scroll region starts below it rather than around it. */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Screens that own their own scrolling (the billing workspace). */
+.contentFlush {
+  overflow: hidden;
+}
