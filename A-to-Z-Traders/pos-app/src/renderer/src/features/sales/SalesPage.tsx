@@ -9,7 +9,7 @@ import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
@@ -18,7 +18,6 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { SaleDetailModal } from './SaleDetailModal'
-import styles from './SalesPage.module.css'
 
 const PAYMENT_BADGE: Record<PaymentType, { label: string; tone: 'good' | 'warn' | 'bad' }> = {
   cash: { label: 'Paid', tone: 'good' },
@@ -67,7 +66,9 @@ export function SalesPage(): JSX.Element {
       key: 'invoice',
       header: 'Invoice',
       width: '150px',
-      render: (sale) => <span className={styles.invoice}>{sale.invoiceNo}</span>
+      render: (sale) => (
+        <span className="font-mono text-caption font-semibold">{sale.invoiceNo}</span>
+      )
     },
     { key: 'date', header: 'Date', width: '120px', render: (sale) => format.date(sale.date) },
     {
@@ -163,7 +164,7 @@ export function SalesPage(): JSX.Element {
       </FilterBar>
 
       <PageBody>
-        <div className={styles.tiles}>
+        <StatGrid min={190}>
           <StatTile
             label="Sales"
             unit={currency}
@@ -187,7 +188,7 @@ export function SalesPage(): JSX.Element {
             value={format.money(onKhata)}
             tone={onKhata > 0 ? 'bad' : 'default'}
           />
-        </div>
+        </StatGrid>
 
         <Card>
           <CardBody flush>

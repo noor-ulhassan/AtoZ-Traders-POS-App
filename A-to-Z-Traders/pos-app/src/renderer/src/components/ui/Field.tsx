@@ -2,7 +2,23 @@ import clsx from 'clsx'
 import type { ComponentPropsWithRef, JSX, ReactNode } from 'react'
 import { useId } from 'react'
 import { Icon } from '../icons/Icon'
-import styles from './Field.module.css'
+
+/**
+ * The shell every text-entry control shares, so a row of mixed inputs lines up
+ * exactly. Exported because a few components outside this file (the combobox,
+ * the date filter) render their own input and must match it to the pixel —
+ * that is the one thing a copied class string would eventually get wrong.
+ */
+export const CONTROL =
+  'h-[34px] w-full rounded-md border border-line-strong bg-paper px-3 text-sm text-ink ' +
+  'transition-[border-color,box-shadow] duration-[120ms] placeholder:text-ink-subtle ' +
+  'hover:not-disabled:not-focus:border-ink-subtle ' +
+  'focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-weak)] focus:outline-none ' +
+  'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle ' +
+  'aria-[invalid=true]:border-bad aria-[invalid=true]:focus:shadow-[0_0_0_3px_var(--bad-weak)]'
+
+/** The taller variant, for the one or two fields a screen is really about. */
+const CONTROL_LARGE = 'h-[42px] text-md font-medium'
 
 /* -------------------------------------------------------------- Field shell */
 
@@ -32,17 +48,23 @@ export function Field({
   className
 }: FieldProps): JSX.Element {
   return (
-    <div className={clsx(styles.field, className)}>
+    <div className={clsx('flex min-w-0 flex-col gap-1', className)}>
       {label && (
-        <label className={clsx(styles.label, required && styles.required)} htmlFor={htmlFor}>
+        <label
+          className={clsx(
+            'text-caption font-medium text-ink-muted',
+            required && 'after:ml-0.5 after:text-bad after:content-["*"]'
+          )}
+          htmlFor={htmlFor}
+        >
           {label}
         </label>
       )}
       {children}
       {error ? (
-        <span className={styles.error}>{error}</span>
+        <span className="text-caption text-bad">{error}</span>
       ) : (
-        hint && <span className={styles.hint}>{hint}</span>
+        hint && <span className="text-caption text-ink-subtle">{hint}</span>
       )}
     </div>
   )
@@ -58,7 +80,7 @@ interface InputProps extends Omit<ComponentPropsWithRef<'input'>, 'size'> {
 export function Input({ invalid, size = 'md', className, ...props }: InputProps): JSX.Element {
   return (
     <input
-      className={clsx(styles.control, size === 'lg' && styles.large, className)}
+      className={clsx(CONTROL, size === 'lg' && CONTROL_LARGE, className)}
       aria-invalid={invalid || undefined}
       {...props}
     />
@@ -84,8 +106,9 @@ interface NumberInputProps extends Omit<
  *
  * The field holds raw text while it is being typed — clearing it, typing "1.",
  * or pasting "1,200" must not fight back — and reports a number to the caller
- * as soon as one can be read. Spinner arrows are hidden: nobody increments a
- * price by 1 at a counter, and the arrows only ever swallow a click.
+ * as soon as one can be read. Spinner arrows never appear because the control
+ * is a text input: nobody increments a price by 1 at a counter, and the arrows
+ * only ever swallow a click.
  */
 export function NumberInput({
   value,
@@ -102,10 +125,10 @@ export function NumberInput({
       inputMode="decimal"
       autoComplete="off"
       className={clsx(
-        styles.control,
-        styles.numeric,
-        size === 'lg' && styles.large,
-        prefix && styles.withPrefix,
+        CONTROL,
+        'text-right tabular-nums',
+        size === 'lg' && CONTROL_LARGE,
+        prefix && 'pl-[42px]',
         className
       )}
       aria-invalid={invalid || undefined}
@@ -131,8 +154,10 @@ export function NumberInput({
   if (!prefix) return control
 
   return (
-    <div className={styles.prefixWrap}>
-      <span className={styles.prefix}>{prefix}</span>
+    <div className="relative flex">
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-caption text-ink-subtle">
+        {prefix}
+      </span>
       {control}
     </div>
   )
@@ -147,15 +172,19 @@ interface SelectProps extends ComponentPropsWithRef<'select'> {
 
 export function Select({ invalid, className, children, ...props }: SelectProps): JSX.Element {
   return (
-    <div className={styles.selectWrap}>
+    <div className="relative flex">
       <select
-        className={clsx(styles.control, styles.select, className)}
+        className={clsx(CONTROL, 'cursor-pointer appearance-none pr-8', className)}
         aria-invalid={invalid || undefined}
         {...props}
       >
         {children}
       </select>
-      <Icon name="chevronDown" size={14} className={styles.selectChevron} />
+      <Icon
+        name="chevronDown"
+        size={14}
+        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-ink-subtle"
+      />
     </div>
   )
 }
@@ -169,7 +198,7 @@ interface TextareaProps extends ComponentPropsWithRef<'textarea'> {
 export function Textarea({ invalid, className, ...props }: TextareaProps): JSX.Element {
   return (
     <textarea
-      className={clsx(styles.control, styles.textarea, className)}
+      className={clsx(CONTROL, 'h-auto min-h-[72px] resize-y px-3 py-2 leading-normal', className)}
       aria-invalid={invalid || undefined}
       {...props}
     />
@@ -194,12 +223,16 @@ export function SearchInput({
   ...props
 }: SearchInputProps): JSX.Element {
   return (
-    <div className={clsx(styles.searchWrap, className)}>
-      <Icon name="search" size={15} className={styles.searchIcon} />
+    <div className={clsx('relative flex min-w-0 flex-1', className)}>
+      <Icon
+        name="search"
+        size={15}
+        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-subtle"
+      />
       <input
         type="search"
         autoComplete="off"
-        className={clsx(styles.control, styles.search)}
+        className={clsx(CONTROL, 'pl-8')}
         placeholder={placeholder}
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
@@ -218,8 +251,16 @@ interface CheckboxProps extends Omit<ComponentPropsWithRef<'input'>, 'type'> {
 export function Checkbox({ label, className, ...props }: CheckboxProps): JSX.Element {
   const id = useId()
   return (
-    <label className={clsx(styles.checkbox, className)} htmlFor={id}>
-      <input id={id} type="checkbox" {...props} />
+    <label
+      className={clsx('inline-flex cursor-pointer items-center gap-2 text-sm', className)}
+      htmlFor={id}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        className="size-4 cursor-pointer accent-[var(--accent)]"
+        {...props}
+      />
       {label}
     </label>
   )

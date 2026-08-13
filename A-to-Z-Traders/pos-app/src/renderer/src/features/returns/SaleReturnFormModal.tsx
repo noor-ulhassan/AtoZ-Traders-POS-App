@@ -4,6 +4,7 @@ import type { Customer, Product, RefundType, SaleWithItems, SellableUnit } from 
 import { today } from '@shared/date'
 import { money as round, sumMoney } from '@shared/money'
 import { Button } from '../../components/ui/Button'
+import { ChosenValue } from '../../components/ui/ChosenValue'
 import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Select, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
@@ -18,7 +19,6 @@ import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
-import styles from './ReturnForm.module.css'
 
 interface SaleReturnFormModalProps {
   onClose: () => void
@@ -238,28 +238,23 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
         </>
       }
     >
-      <div className={styles.head}>
+      <div className="mb-4 flex items-start gap-4">
         <Field
           label="Original bill"
           hint="Recommended — keeps profit and stock exactly right"
-          className={styles.grow}
+          className="min-w-0 flex-1"
         >
           {sale ? (
-            <div className={styles.selected}>
-              <span>
-                <strong>{sale.invoiceNo}</strong> · {format.date(sale.date)} ·{' '}
-                {sale.customerName ?? 'Walk-in'}
-              </span>
-              <Button
-                variant="ghost"
-                icon="close"
-                aria-label="Clear bill"
-                onClick={() => {
-                  setSale(null)
-                  setLines([])
-                }}
-              />
-            </div>
+            <ChosenValue
+              clearLabel="Clear bill"
+              onClear={() => {
+                setSale(null)
+                setLines([])
+              }}
+            >
+              <strong>{sale.invoiceNo}</strong> · {format.date(sale.date)} ·{' '}
+              {sale.customerName ?? 'Walk-in'}
+            </ChosenValue>
           ) : (
             <Combobox
               query={invoiceQuery}
@@ -277,19 +272,16 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
           )}
         </Field>
 
-        <Field label="Customer" className={styles.grow}>
+        <Field label="Customer" className="min-w-0 flex-1">
           {customer ? (
-            <div className={styles.selected}>
-              <span>{customer.name}</span>
-              {!sale && (
-                <Button
-                  variant="ghost"
-                  icon="close"
-                  aria-label="Clear customer"
-                  onClick={() => setCustomer(null)}
-                />
-              )}
-            </div>
+            /* With a bill attached the customer comes from it, so it cannot
+                be cleared independently. */
+            <ChosenValue
+              clearLabel="Clear customer"
+              onClear={sale ? undefined : () => setCustomer(null)}
+            >
+              {customer.name}
+            </ChosenValue>
           ) : (
             <Combobox
               query={customerQuery}
@@ -302,13 +294,13 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
           )}
         </Field>
 
-        <Field label="Date" className={styles.narrow}>
+        <Field label="Date" className="w-[170px] shrink-0">
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </Field>
       </div>
 
       {!sale && (
-        <div className={styles.addRow}>
+        <div className="mb-4">
           <Field label="Add item">
             <Combobox
               query={productQuery}
@@ -322,7 +314,7 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
         </div>
       )}
 
-      <div className={styles.table}>
+      <div className="mb-4 overflow-hidden rounded-md border border-line">
         <DataTable
           columns={columns}
           rows={lines}
@@ -337,8 +329,8 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
         />
       </div>
 
-      <div className={styles.foot}>
-        <Field label="Refund method" className={styles.narrow}>
+      <div className="flex items-start gap-4">
+        <Field label="Refund method" className="w-[170px] shrink-0">
           <Select
             value={refundType}
             onChange={(event) => setRefundType(event.target.value as RefundType)}
@@ -350,11 +342,11 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
           </Select>
         </Field>
 
-        <Field label="Notes" className={styles.grow}>
+        <Field label="Notes" className="min-w-0 flex-1">
           <Textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </Field>
 
-        <div className={styles.totals}>
+        <div className="w-[260px] shrink-0">
           <SummaryList
             rows={[
               { label: 'Items returning', value: activeLines.length },

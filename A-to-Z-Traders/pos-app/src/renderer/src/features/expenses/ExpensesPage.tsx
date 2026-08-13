@@ -7,7 +7,7 @@ import { SearchInput, Select } from '../../components/ui/Field'
 import { Card, CardBody } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell, RowActions } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useDebounced } from '../../hooks/useDebounced'
@@ -17,7 +17,6 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { ExpenseFormModal } from './ExpenseFormModal'
-import styles from './ExpensesPage.module.css'
 
 export function ExpensesPage(): JSX.Element {
   const currency = useCurrency()
@@ -169,7 +168,7 @@ export function ExpensesPage(): JSX.Element {
       </FilterBar>
 
       <PageBody>
-        <div className={styles.tiles}>
+        <StatGrid>
           <StatTile
             label="Total in period"
             unit={currency}
@@ -183,7 +182,7 @@ export function ExpensesPage(): JSX.Element {
             value={format.money(biggest?.amount ?? 0)}
             footnote={biggest?.title}
           />
-        </div>
+        </StatGrid>
 
         <Card>
           <CardBody flush>

@@ -4,7 +4,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useHotkey } from '../../hooks/useHotkey'
 import { NAVIGATION } from './navigation'
 import { Sidebar } from './Sidebar'
-import styles from './AppShell.module.css'
 
 /** Screens that manage their own scroll region, so the shell must not pad them. */
 const FLUSH_ROUTES = ['/billing']
@@ -27,10 +26,17 @@ export function AppShell(): JSX.Element {
   })
 
   return (
-    <div className={styles.shell}>
+    <div className="grid h-screen grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden">
       <Sidebar />
-      <main className={styles.main}>
-        <div className={clsx(styles.content, flush && styles.contentFlush)}>
+      <main className="flex min-w-0 flex-col overflow-hidden bg-canvas">
+        {/* The page header is full-bleed and sticks to the top of the work
+            area, so the scroll region starts below it rather than around it. */}
+        <div
+          className={clsx(
+            'flex min-h-0 flex-1 flex-col',
+            flush ? 'overflow-hidden' : 'overflow-y-auto'
+          )}
+        >
           <Outlet />
         </div>
       </main>

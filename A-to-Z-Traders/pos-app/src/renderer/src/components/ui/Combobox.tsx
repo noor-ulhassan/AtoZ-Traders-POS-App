@@ -2,7 +2,6 @@ import clsx from 'clsx'
 import type { JSX, KeyboardEvent, ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Input } from './Field'
-import styles from './Combobox.module.css'
 
 export interface ComboOption<T> {
   value: T
@@ -108,7 +107,7 @@ export function Combobox<T>({
   const showList = isOpen && query.trim().length > 0
 
   return (
-    <div className={styles.wrap} ref={wrapRef}>
+    <div className="relative w-full" ref={wrapRef}>
       <Input
         ref={inputRef}
         value={query}
@@ -130,9 +129,14 @@ export function Combobox<T>({
       />
 
       {showList && (
-        <div className={styles.list} id="combobox-list" role="listbox" ref={listRef}>
+        <div
+          className="absolute top-[calc(100%+4px)] right-0 left-0 z-50 max-h-80 overflow-y-auto rounded-md border border-line-strong bg-paper p-1 shadow-popover"
+          id="combobox-list"
+          role="listbox"
+          ref={listRef}
+        >
           {options.length === 0 ? (
-            <div className={styles.noResults}>{noResults}</div>
+            <div className="p-4 text-center text-sm text-ink-subtle">{noResults}</div>
           ) : (
             options.map((option, index) => (
               <button
@@ -140,17 +144,24 @@ export function Combobox<T>({
                 type="button"
                 role="option"
                 aria-selected={index === activeIndex}
-                className={clsx(styles.option, index === activeIndex && styles.active)}
+                className={clsx(
+                  'flex w-full cursor-pointer items-center justify-between gap-3 rounded-sm px-3 py-2 text-left text-sm',
+                  index === activeIndex ? 'bg-accent-weak' : 'hover:bg-surface-hover'
+                )}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => choose(option)}
               >
-                <span className={styles.optionMain}>
-                  <span className={styles.optionTitle}>{option.title}</span>
+                <span className="flex min-w-0 flex-col gap-px">
+                  <span className="truncate font-medium">{option.title}</span>
                   {option.subtitle && (
-                    <span className={styles.optionSubtitle}>{option.subtitle}</span>
+                    <span className="text-caption text-ink-subtle">{option.subtitle}</span>
                   )}
                 </span>
-                {option.meta && <span className={styles.optionMeta}>{option.meta}</span>}
+                {option.meta && (
+                  <span className="shrink-0 text-right text-caption tabular-nums text-ink-muted">
+                    {option.meta}
+                  </span>
+                )}
               </button>
             ))
           )}

@@ -4,6 +4,7 @@ import type { Customer, Product, SellableUnit } from '@shared/types'
 import { today } from '@shared/date'
 import { money as round, sumMoney } from '@shared/money'
 import { Button } from '../../components/ui/Button'
+import { ChosenValue } from '../../components/ui/ChosenValue'
 import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Select, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
@@ -16,7 +17,6 @@ import { useProductSearch } from '../../hooks/useProductSearch'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
-import styles from './ReturnForm.module.css'
 
 interface PurchaseReturnFormModalProps {
   onClose: () => void
@@ -214,18 +214,12 @@ export function PurchaseReturnFormModal({
         </>
       }
     >
-      <div className={styles.head}>
-        <Field label="Supplier" className={styles.grow} hint="The payable to reduce">
+      <div className="mb-4 flex items-start gap-4">
+        <Field label="Supplier" className="min-w-0 flex-1" hint="The payable to reduce">
           {supplier ? (
-            <div className={styles.selected}>
-              <span>{supplier.name}</span>
-              <Button
-                variant="ghost"
-                icon="close"
-                aria-label="Clear supplier"
-                onClick={() => setSupplier(null)}
-              />
-            </div>
+            <ChosenValue clearLabel="Clear supplier" onClear={() => setSupplier(null)}>
+              {supplier.name}
+            </ChosenValue>
           ) : (
             <Combobox
               query={supplierQuery}
@@ -238,7 +232,7 @@ export function PurchaseReturnFormModal({
           )}
         </Field>
 
-        <Field label="Add item" className={styles.grow}>
+        <Field label="Add item" className="min-w-0 flex-1">
           <Combobox
             query={productQuery}
             onQueryChange={setProductQuery}
@@ -249,12 +243,12 @@ export function PurchaseReturnFormModal({
           />
         </Field>
 
-        <Field label="Date" className={styles.narrow}>
+        <Field label="Date" className="w-[170px] shrink-0">
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </Field>
       </div>
 
-      <div className={styles.table}>
+      <div className="mb-4 overflow-hidden rounded-md border border-line">
         <DataTable
           columns={columns}
           rows={lines}
@@ -267,12 +261,12 @@ export function PurchaseReturnFormModal({
         />
       </div>
 
-      <div className={styles.foot}>
-        <Field label="Notes" className={styles.grow}>
+      <div className="flex items-start gap-4">
+        <Field label="Notes" className="min-w-0 flex-1">
           <Textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </Field>
 
-        <div className={styles.totals}>
+        <div className="w-[260px] shrink-0">
           <SummaryList
             rows={[
               { label: 'Lines', value: lines.length },
