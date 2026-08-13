@@ -194,15 +194,15 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
   const params: RangeParams = { from: range.from, to: range.to }
 
   const rows = db
-    .prepare<
-      RangeParams,
-      { date: string; sales: number; bill_count: number; cogs: number; discount: number }
-    >(
+    .prepare<RangeParams, { date: string; sales: number; bill_count: number; cogs: number }>(
+      // Sales here is net revenue: subtotal after the bill discount, EXCLUDING
+      // tax. Using s.total would fold collected tax into both sales and profit —
+      // tax is money held for the government, never earned (see profitAndLoss).
+      // When tax is off (the default) this equals s.total exactly.
       `SELECT s.date                            AS date,
-              SUM(s.total)                      AS sales,
+              SUM(s.subtotal - s.discount)      AS sales,
               COUNT(DISTINCT s.id)              AS bill_count,
-              COALESCE(SUM(line.cogs), 0)       AS cogs,
-              SUM(s.discount)                   AS discount
+              COALESCE(SUM(line.cogs), 0)       AS cogs
          FROM sales s
          LEFT JOIN (
               SELECT sale_id, SUM(cost_price * base_qty) AS cogs
@@ -219,8 +219,8 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
     byDate.set(row.date, {
       date: row.date,
       sales: money(row.sales),
-      // Profit per day mirrors the P&L definition minus returns and expenses,
-      // which are not per-bill figures.
+      // Mirrors the P&L gross profit per bill (net sales − COGS), minus returns
+      // and expenses, which are not per-bill figures.
       profit: money(row.sales - row.cogs),
       billCount: row.bill_count
     })

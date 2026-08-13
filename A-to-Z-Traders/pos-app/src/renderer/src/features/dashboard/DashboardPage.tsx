@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { DateRange, LowStockRow, ProductProfitRow, RecentSaleRow } from '@shared/types'
+import type { DateRange, LowStockRow, RecentSaleRow } from '@shared/types'
 import { resolvePreset } from '@shared/date'
 import { Button } from '../../components/ui/Button'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
@@ -9,7 +9,8 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
-import { TrendChart } from '../../components/ui/TrendChart'
+import { SalesTrendChart } from '../../components/ui/charts/SalesTrendChart'
+import { TopProductsChart } from '../../components/ui/charts/TopProductsChart'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
@@ -67,26 +68,6 @@ export function DashboardPage(): JSX.Element {
       numeric: true,
       width: '130px',
       render: (row) => format.money(row.total)
-    }
-  ]
-
-  const topColumns: Column<ProductProfitRow>[] = [
-    { key: 'product', header: 'Product', render: (row) => row.productName },
-    {
-      key: 'revenue',
-      header: `Sales (${currency})`,
-      numeric: true,
-      width: '130px',
-      render: (row) => format.money(row.revenue)
-    },
-    {
-      key: 'profit',
-      header: `Profit (${currency})`,
-      numeric: true,
-      width: '130px',
-      render: (row) => (
-        <ToneValue tone={row.profit < 0 ? 'bad' : 'good'}>{format.money(row.profit)}</ToneValue>
-      )
     }
   ]
 
@@ -184,7 +165,7 @@ export function DashboardPage(): JSX.Element {
                 subtitle={`${format.date(range.from)} to ${format.date(range.to)}`}
               />
               <CardBody>
-                <TrendChart points={data?.trend ?? []} height={220} />
+                <SalesTrendChart points={data?.trend ?? []} height={240} />
               </CardBody>
             </Card>
 
@@ -243,14 +224,8 @@ export function DashboardPage(): JSX.Element {
 
             <Card>
               <CardHeader title="Top products" subtitle="By sales in this period" />
-              <CardBody flush>
-                <DataTable
-                  columns={topColumns}
-                  rows={data?.topProducts ?? []}
-                  rowKey={(row) => row.productId}
-                  compact
-                  empty={{ title: 'No sales in this period' }}
-                />
+              <CardBody>
+                <TopProductsChart rows={data?.topProducts ?? []} />
               </CardBody>
             </Card>
           </div>

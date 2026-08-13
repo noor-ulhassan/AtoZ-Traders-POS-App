@@ -432,3 +432,34 @@ describe('the khata', () => {
     ).toThrowError(/opening balance can no longer be changed/i)
   })
 })
+
+describe('tax never inflates sales or profit', () => {
+  // Guards the reportService fix: with tax on, the daily summary and P&L must
+  // measure sales and profit net of tax — collected tax is not revenue.
+  it('excludes collected tax from the daily summary and the P&L', () => {
+    settingsService.updateSettings({ taxEnabled: true, taxRate: 10 })
+
+    // 10 @ 150 = 1500 subtotal; cost 100/unit -> COGS 1000; 10% tax -> total 1650.
+    const { sale } = salesService.createSale({
+      items: [{ productId: product.id, unitName: 'piece', qty: 10, rate: 150 }],
+      paymentType: 'cash',
+      paidAmount: 1650
+    })
+    expect(sale.total).toBe(1650)
+    expect(sale.tax).toBe(150)
+
+    const range = { from: today(), to: today() }
+
+    const summary = reportService.salesSummary(range)
+    // Sales is net of tax (1500, not 1650); profit excludes tax (500, not 650).
+    expect(summary.totalSales).toBe(1500)
+    expect(summary.totalProfit).toBe(500)
+    expect(summary.daily.at(-1)?.profit).toBe(500)
+
+    const pnl = reportService.profitAndLoss(range)
+    expect(pnl.taxCollected).toBe(150)
+    expect(pnl.netSales).toBe(1500)
+    expect(pnl.grossProfit).toBe(500)
+    expect(pnl.netProfit).toBe(500)
+  })
+})

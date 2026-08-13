@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import type { ComponentPropsWithRef, JSX, ReactNode } from 'react'
-import { useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Icon } from '../icons/Icon'
 
 /**
@@ -104,11 +104,13 @@ interface NumberInputProps extends Omit<
 /**
  * A numeric entry that behaves the way a till operator expects.
  *
- * The field holds raw text while it is being typed — clearing it, typing "1.",
- * or pasting "1,200" must not fight back — and reports a number to the caller
- * as soon as one can be read. Spinner arrows never appear because the control
- * is a text input: nobody increments a price by 1 at a counter, and the arrows
- * only ever swallow a click.
+ * The field holds its own draft string while it is being typed — so a decimal
+ * mid-entry ("0.", ".5", "1.") or a grouped paste ("1,200") survives the next
+ * re-render instead of being snapped back to the parsed whole number. Without
+ * that draft a decimal point is impossible to type at all: half a litre of
+ * petrol or a quarter kilo of ghee could never be billed. Spinner arrows never
+ * appear because the control is a text input — nobody increments a price by 1
+ * at a counter, and the arrows only ever swallow a click.
  */
 export function NumberInput({
   value,
@@ -119,8 +121,27 @@ export function NumberInput({
   className,
   ...props
 }: NumberInputProps): JSX.Element {
+  const [draft, setDraft] = useState<string>(value === '' ? '' : String(value))
+
+  // Adopt a value set from outside (a reset, a suggested rate, a unit change)
+  // but never rewrite what the user is mid-way through typing: compared as
+  // numbers, so "0.50" is left alone while an external change to a different
+  // amount still lands. A transient like "." leaves `value` untouched, so this
+  // effect does not run and the half-typed decimal is kept.
+  useEffect(() => {
+    const shown = draft.trim() === '' ? NaN : Number(draft.replace(/,/g, ''))
+    const target = value === '' ? NaN : value
+    if (Number.isNaN(shown) && Number.isNaN(target)) return
+    // Syncing a draft to an external value is the intended use of this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (shown !== target) setDraft(value === '' ? '' : String(value))
+    // Only external `value` changes should sync the field; `draft` is owned here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
+
   const control = (
     <input
+      {...props}
       type="text"
       inputMode="decimal"
       autoComplete="off"
@@ -132,9 +153,11 @@ export function NumberInput({
         className
       )}
       aria-invalid={invalid || undefined}
-      value={value === '' ? '' : String(value)}
+      value={draft}
       onChange={(event) => {
-        const raw = event.target.value.replace(/,/g, '').trim()
+        const next = event.target.value
+        setDraft(next)
+        const raw = next.replace(/,/g, '').trim()
         if (raw === '') {
           onValueChange(0)
           return
@@ -147,7 +170,12 @@ export function NumberInput({
         event.target.select()
         props.onFocus?.(event)
       }}
-      {...props}
+      onBlur={(event) => {
+        // Settle the field on the canonical number once editing ends: "1." -> "1",
+        // an empty field -> "0" (matching the 0 already reported on clear).
+        setDraft(value === '' ? '' : String(value))
+        props.onBlur?.(event)
+      }}
     />
   )
 
