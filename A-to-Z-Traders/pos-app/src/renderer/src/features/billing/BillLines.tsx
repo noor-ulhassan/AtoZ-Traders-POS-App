@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import type { JSX } from 'react'
+import type { JSX, KeyboardEvent, RefObject } from 'react'
 import { Button } from '../../components/ui/Button'
 import { NumberInput, Select } from '../../components/ui/Field'
 import { Column, DataTable } from '../../components/ui/DataTable'
@@ -12,7 +12,13 @@ interface BillLinesProps {
   onUpdate: (key: number, patch: Partial<BillLine>) => void
   onChangeUnit: (line: BillLine, unitName: string) => void
   onRemove: (key: number) => void
+  /** Enter/Escape/arrow-off-the-top return here — usually the product search. */
+  onFocusSearch: () => void
+  /** Attached to the table wrapper so the page can focus a specific cell (F3). */
+  containerRef: RefObject<HTMLDivElement | null>
 }
+
+const FIELD_NAME = /^bill-(qty|rate|discount)-(\d+)$/
 
 /** Shown next to a rate the customer was given last time. */
 const PRICE_FLAG: Partial<Record<BillLine['priceSource'], string>> = {
@@ -24,8 +30,63 @@ export function BillLines({
   currency,
   onUpdate,
   onChangeUnit,
-  onRemove
+  onRemove,
+  onFocusSearch,
+  containerRef
 }: BillLinesProps): JSX.Element {
+  /** Move focus to a specific editable cell; returns false if it isn't there. */
+  const focusCell = (field: string, row: number): boolean => {
+    const cell = containerRef.current?.querySelector<HTMLInputElement>(
+      `input[name="bill-${field}-${row}"]`
+    )
+    cell?.focus()
+    return Boolean(cell)
+  }
+
+  /**
+   * Turns the line table into a keyboard grid: ↑/↓ walk a column, Enter/Escape
+   * hand focus back to the search box for the next scan, and Alt+Delete drops
+   * the current line — so a whole bill can be edited without the mouse.
+   */
+  const onGridKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const target = event.target as HTMLElement
+    if (target.tagName !== 'INPUT') return
+    const match = FIELD_NAME.exec((target as HTMLInputElement).name)
+    if (!match) return
+
+    const field = match[1]
+    const row = Number(match[2])
+
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault()
+        focusCell(field, row + 1)
+        break
+      case 'ArrowUp':
+        event.preventDefault()
+        if (!focusCell(field, row - 1)) onFocusSearch()
+        break
+      case 'Enter':
+      case 'Escape':
+        event.preventDefault()
+        onFocusSearch()
+        break
+      case 'Delete':
+        if (event.altKey) {
+          event.preventDefault()
+          const line = lines[row]
+          if (line) {
+            onRemove(line.key)
+            // Land on the row that slid up into this slot, or the search box.
+            requestAnimationFrame(() => {
+              if (!focusCell(field, row) && !focusCell(field, row - 1)) onFocusSearch()
+            })
+          }
+        }
+        break
+    }
+  }
+
   const columns: Column<BillLine>[] = [
     {
       key: 'product',
@@ -68,8 +129,9 @@ export function BillLines({
       header: 'Qty',
       numeric: true,
       width: '100px',
-      render: (line) => (
+      render: (line, index) => (
         <NumberInput
+          name={`bill-qty-${index}`}
           value={line.qty}
           onValueChange={(value) => onUpdate(line.key, { qty: value })}
         />
@@ -80,7 +142,7 @@ export function BillLines({
       header: `Rate (${currency})`,
       numeric: true,
       width: '170px',
-      render: (line) => (
+      render: (line, index) => (
         <div className="flex items-center justify-end gap-2">
           {PRICE_FLAG[line.priceSource] && (
             <span className="text-[10px] font-semibold tracking-[0.04em] text-accent uppercase whitespace-nowrap">
@@ -88,6 +150,7 @@ export function BillLines({
             </span>
           )}
           <NumberInput
+            name={`bill-rate-${index}`}
             value={line.rate}
             onValueChange={(value) =>
               onUpdate(line.key, { rate: value, priceSource: 'unit_default' })
@@ -101,8 +164,9 @@ export function BillLines({
       header: `Less (${currency})`,
       numeric: true,
       width: '120px',
-      render: (line) => (
+      render: (line, index) => (
         <NumberInput
+          name={`bill-discount-${index}`}
           value={line.lineDiscount}
           onValueChange={(value) => onUpdate(line.key, { lineDiscount: value })}
         />
@@ -132,15 +196,17 @@ export function BillLines({
   ]
 
   return (
-    <DataTable
-      columns={columns}
-      rows={lines}
-      rowKey={(line) => line.key}
-      empty={{
-        title: 'Start the bill',
-        description:
-          'Scan a barcode or search for an item above. The rate fills in from what this customer paid last time, and you can type over it.'
-      }}
-    />
+    <div ref={containerRef} onKeyDown={onGridKeyDown}>
+      <DataTable
+        columns={columns}
+        rows={lines}
+        rowKey={(line) => line.key}
+        empty={{
+          title: 'Start the bill',
+          description:
+            'Scan a barcode or search for an item above. The rate fills in from what this customer paid last time, and you can type over it.'
+        }}
+      />
+    </div>
   )
 }

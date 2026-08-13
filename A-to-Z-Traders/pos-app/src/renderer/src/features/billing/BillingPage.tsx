@@ -59,6 +59,9 @@ export function BillingPage(): JSX.Element {
 
   const searchRef = useRef<HTMLInputElement>(null)
   const paidRef = useRef<HTMLInputElement>(null)
+  const customerRef = useRef<HTMLInputElement>(null)
+  const paymentRef = useRef<HTMLDivElement>(null)
+  const linesRef = useRef<HTMLDivElement>(null)
 
   const productSearch = useProductSearch(productQuery)
   const customerSearch = usePartySearch('customer', customerQuery)
@@ -156,7 +159,33 @@ export function BillingPage(): JSX.Element {
     }
   }
 
+  const focusSearch = (): void => searchRef.current?.focus()
+
+  /** Jump to the quantity of the item just added, ready to type over the "1". */
+  const focusLastQty = (): void => {
+    if (bill.lines.length === 0) {
+      focusSearch()
+      return
+    }
+    linesRef.current
+      ?.querySelector<HTMLInputElement>(`input[name="bill-qty-${bill.lines.length - 1}"]`)
+      ?.focus()
+  }
+
+  /** Focus the selected payment segment; ←/→ then move between the three. */
+  const focusPayment = (): void => {
+    const control = paymentRef.current
+    const target =
+      control?.querySelector<HTMLButtonElement>('button[tabindex="0"]') ??
+      control?.querySelector<HTMLButtonElement>('button:not([disabled])')
+    target?.focus()
+  }
+
+  useHotkey('F2', focusSearch, { allowInInput: true })
+  useHotkey('F3', focusLastQty, { allowInInput: true })
   useHotkey('F4', () => paidRef.current?.focus(), { allowInInput: true })
+  useHotkey('F6', () => customerRef.current?.focus(), { allowInInput: true })
+  useHotkey('F7', focusPayment, { allowInInput: true })
   useHotkey('ctrl+enter', () => void submit(), { allowInInput: true })
   useHotkey('F8', () => void clearBill(), { allowInInput: true })
 
@@ -199,16 +228,33 @@ export function BillingPage(): JSX.Element {
             size="lg"
             autoFocus
           />
-          <div className="mt-2 flex gap-4 text-caption text-ink-subtle">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-subtle">
             <span>
-              <Kbd>Enter</Kbd> add first match
+              <Kbd>Enter</Kbd> add item
             </span>
             <span>
-              <Kbd>F4</Kbd> amount received
+              <Kbd>F3</Kbd> edit qty
+            </span>
+            <span>
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd> move rows
+            </span>
+            <span>
+              <Kbd>Alt</Kbd>
+              <Kbd>Del</Kbd> remove line
+            </span>
+            <span>
+              <Kbd>F6</Kbd> customer
+            </span>
+            <span>
+              <Kbd>F7</Kbd> payment
+            </span>
+            <span>
+              <Kbd>F4</Kbd> amount
             </span>
             <span>
               <Kbd>Ctrl</Kbd>
-              <Kbd>Enter</Kbd> save bill
+              <Kbd>Enter</Kbd> save
             </span>
             <span>
               <Kbd>F8</Kbd> clear
@@ -225,6 +271,8 @@ export function BillingPage(): JSX.Element {
               void bill.changeUnit(line, unitName, bill.customer?.id ?? null)
             }
             onRemove={bill.removeLine}
+            onFocusSearch={focusSearch}
+            containerRef={linesRef}
           />
         </div>
       </section>
@@ -260,6 +308,7 @@ export function BillingPage(): JSX.Element {
                   onSelect={(option) => chooseCustomer(option.value)}
                   placeholder="Search by name or phone"
                   noResults="No customer matches"
+                  inputRef={customerRef}
                 />
               )}
             </Field>
@@ -305,7 +354,7 @@ export function BillingPage(): JSX.Element {
           </div>
 
           <div className="border-b border-line px-5 py-4">
-            <div className="mb-4">
+            <div className="mb-4" ref={paymentRef}>
               <SegmentedControl
                 label="Payment type"
                 fullWidth
