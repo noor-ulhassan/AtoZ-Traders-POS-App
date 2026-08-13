@@ -1,134 +1,265 @@
+@import 'tailwindcss';
 @import './tokens.css';
+
+/* Components live in `src/`, not next to this stylesheet. */
+@source '../';
+
+/* ==========================================================================
+   Theme
+   --------------------------------------------------------------------------
+   Tailwind's utility namespaces are bound to the design tokens rather than to
+   a palette of its own. `@theme inline` matters here: it makes `bg-paper`
+   compile to `background-color: var(--paper)` instead of copying the token's
+   value at build time, so the dark palette in tokens.css keeps working by
+   redefining one variable — exactly as it did before Tailwind.
+
+   The default scales are cleared first. A `bg-slate-700` that resolves to a
+   colour no token knows about is precisely the drift the token file exists to
+   prevent, so those utilities should not compile at all.
+   ========================================================================== */
+
+@theme inline {
+  --color-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+  --shadow-*: initial;
+
+  /* ---- structural colours with no palette meaning. `white` is here because a
+     label on a solid accent or danger fill stays white in both palettes —
+     `--ink-inverse` inverts with the theme and would turn dark-on-blue. */
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+
+  /* ---- neutrals */
+  --color-paper: var(--paper);
+  --color-canvas: var(--canvas);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-inverse: var(--ink-inverse);
+
+  /* ---- accent */
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-weak: var(--accent-weak);
+  --color-accent-border: var(--accent-border);
+  --color-accent-ink: var(--accent-ink);
+
+  /* ---- semantic: money and state */
+  --color-good: var(--good);
+  --color-good-weak: var(--good-weak);
+  --color-good-border: var(--good-border);
+
+  --color-bad: var(--bad);
+  --color-bad-weak: var(--bad-weak);
+  --color-bad-border: var(--bad-border);
+
+  --color-warn: var(--warn);
+  --color-warn-weak: var(--warn-weak);
+  --color-warn-border: var(--warn-border);
+
+  --color-info: var(--info);
+  --color-info-weak: var(--info-weak);
+
+  /* ---- sidebar */
+  --color-nav-bg: var(--nav-bg);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-ink-strong: var(--nav-ink-strong);
+  --color-nav-ink-muted: var(--nav-ink-muted);
+  --color-nav-hover: var(--nav-hover);
+  --color-nav-active: var(--nav-active);
+  --color-nav-line: var(--nav-line);
+
+  /* ---- type */
+  --font-ui: var(--family-ui);
+  --font-display: var(--family-display);
+  --font-mono: var(--family-mono);
+
+  --text-micro: var(--fs-micro);
+  --text-micro--line-height: 1.4;
+  --text-caption: var(--fs-caption);
+  --text-caption--line-height: 1.4;
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: 1.45;
+  --text-base: var(--fs-base);
+  --text-base--line-height: var(--lh-normal);
+  --text-md: var(--fs-md);
+  --text-md--line-height: var(--lh-normal);
+  --text-lg: var(--fs-lg);
+  --text-lg--line-height: var(--lh-tight);
+  --text-xl: var(--fs-xl);
+  --text-xl--line-height: 1.2;
+  --text-2xl: var(--fs-2xl);
+  --text-2xl--line-height: 1.15;
+
+  /* ---- elevation: reserved for things that float above the page */
+  --shadow-popover: var(--elevation-popover);
+  --shadow-modal: var(--elevation-modal);
+}
+
+/* Entrances for the three things in the app that appear over the page. Each is
+   short enough to feel like the surface was already there — and every one of
+   them is cancelled wholesale by the reduced-motion block below. */
+@theme {
+  --animate-fade-in: fade-in 0.12s ease-out;
+  --animate-rise-in: rise-in 0.14s ease-out;
+  --animate-slide-in: slide-in 0.16s ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+  }
+}
+
+/* The token file switches on an explicit `data-theme` first and the OS
+   preference second. `dark:` has to agree with it, or a utility would disagree
+   with the variable underneath it. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+
+  &:where(:root[data-theme='dark'], :root[data-theme='dark'] *) {
+    @slot;
+  }
+}
 
 /* ==========================================================================
    Base
-   Reset, document defaults and the handful of global element styles the app
-   relies on. Everything beyond this lives in a component's CSS module.
+   Document defaults and the handful of global element styles the app relies
+   on. Everything beyond this is a utility on the element that needs it.
    ========================================================================== */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
-
-body {
-  background: var(--canvas);
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-
-  /* A desktop app, not a document: the shell owns scrolling, and a stray
-     text selection while clicking through a bill is only ever a nuisance. */
-  overflow: hidden;
-  user-select: none;
-  cursor: default;
-}
-
-/* Selection is allowed where reading matters. */
-input,
-textarea,
-[data-selectable] {
-  user-select: text;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  line-height: var(--leading-tight);
-  text-wrap: balance;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-}
-
-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-table {
-  border-collapse: collapse;
-  border-spacing: 0;
-}
-
-/* Digits that sit in a column must line up, everywhere, always. */
-table,
-[data-numeric] {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-:focus {
-  outline: none;
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  border-radius: var(--radius-sm);
-}
-
-/* ---- scrollbars: present but quiet */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
-  border: 3px solid transparent;
-  background-clip: content-box;
-  border-radius: var(--radius-pill);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-subtle);
-  background-clip: content-box;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
   }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--family-ui);
+    font-size: var(--fs-base);
+    line-height: var(--lh-normal);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+
+    /* A desktop app, not a document: the shell owns scrolling, and a stray
+       text selection while clicking through a bill is only ever a nuisance. */
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* Selection is allowed where reading matters. */
+  input,
+  textarea,
+  [data-selectable] {
+    user-select: text;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--family-display);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    text-wrap: balance;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  /* Digits that sit in a column must line up, everywhere, always. */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-radius: 4px;
+  }
+
+  /* ---- scrollbars: present but quiet */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-subtle);
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ==========================================================================
+   Utilities that are not one-offs
+   Two patterns recur across nearly every screen and are worth a name rather
+   than a repeated string of six utilities.
+   ========================================================================== */
+
+@utility focus-ring {
+  box-shadow: var(--focus-ring);
+}
+
+@utility focus-ring-tight {
+  box-shadow: var(--focus-ring-tight);
 }

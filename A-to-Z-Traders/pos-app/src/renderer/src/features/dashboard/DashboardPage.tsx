@@ -8,7 +8,7 @@ import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { TrendChart } from '../../components/ui/TrendChart'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useQuery } from '../../hooks/useQuery'
@@ -16,7 +16,6 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useSettings } from '../../app/SettingsContext'
 import { SetupChecklist } from './SetupChecklist'
-import styles from './DashboardPage.module.css'
 
 /**
  * The screen the shop opens on.
@@ -142,7 +141,7 @@ export function DashboardPage(): JSX.Element {
       </FilterBar>
 
       <PageBody>
-        <div className={styles.tiles}>
+        <StatGrid min={200}>
           <StatTile
             label="Sales"
             unit={currency}
@@ -179,10 +178,10 @@ export function DashboardPage(): JSX.Element {
             unit={currency}
             value={format.money(data?.payables ?? 0)}
           />
-        </div>
+        </StatGrid>
 
-        <div className={styles.split}>
-          <div className={styles.stack}>
+        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start gap-5">
+          <div className="flex flex-col gap-5">
             <Card>
               <CardHeader
                 title="Sales trend"
@@ -219,7 +218,7 @@ export function DashboardPage(): JSX.Element {
             </Card>
           </div>
 
-          <div className={styles.stack}>
+          <div className="flex flex-col gap-5">
             <SetupChecklist settings={settings} info={info.data} />
 
             <Card>

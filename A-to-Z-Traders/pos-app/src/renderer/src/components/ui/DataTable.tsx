@@ -1,7 +1,20 @@
 import clsx from 'clsx'
 import type { JSX, ReactNode } from 'react'
 import { EmptyState } from './Feedback'
-import styles from './DataTable.module.css'
+
+/**
+ * Cell styling lives on the cells rather than on descendant selectors from the
+ * table, so a caller who renders their own `<tr>` into `footer` gets the same
+ * treatment by reaching for the same constant.
+ */
+const HEAD_CELL =
+  'sticky top-0 z-1 border-b border-line bg-surface-sunken text-left text-caption font-semibold whitespace-nowrap text-ink-muted'
+
+const BODY_CELL = 'border-b border-line align-middle text-ink'
+
+/** Totals row pinned to the bottom of a table. */
+export const FOOTER_ROW =
+  '[&_td]:sticky [&_td]:bottom-0 [&_td]:h-[var(--row-height)] [&_td]:border-t [&_td]:border-line-strong [&_td]:bg-surface-sunken [&_td]:px-4 [&_td]:font-semibold'
 
 export interface Column<Row> {
   key: string
@@ -48,22 +61,29 @@ export function DataTable<Row>({
 }: DataTableProps<Row>): JSX.Element {
   if (!isLoading && rows.length === 0 && empty) {
     return (
-      <div className={styles.empty}>
+      <div className="px-6 py-12">
         <EmptyState title={empty.title} description={empty.description} action={empty.action} />
       </div>
     )
   }
 
+  // Numeric columns are right-aligned and share one digit width so the decimal
+  // points form a straight edge down the column.
+  const align = (column: Column<Row>): string =>
+    clsx(column.numeric && 'text-right tabular-nums', column.center && 'text-center')
+
+  const density = compact ? 'h-8 px-3' : 'px-4'
+
   return (
-    <div className={clsx(styles.scroller, className)}>
-      <table className={clsx(styles.table, compact && styles.compact)}>
+    <div className={clsx('w-full overflow-auto', className)}>
+      <table className="w-full text-sm">
         <thead>
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
                 style={column.width ? { width: column.width } : undefined}
-                className={clsx(column.numeric && styles.numeric, column.center && styles.center)}
+                className={clsx(HEAD_CELL, density, !compact && 'h-[34px]', align(column))}
               >
                 {column.header}
               </th>
@@ -72,16 +92,19 @@ export function DataTable<Row>({
         </thead>
         <tbody>
           {isLoading && rows.length === 0 ? (
-            <tr className={styles.loadingRow}>
-              <td colSpan={columns.length}>Loading…</td>
+            <tr>
+              <td colSpan={columns.length} className="h-24 text-center text-ink-subtle">
+                Loading…
+              </td>
             </tr>
           ) : (
             rows.map((row, index) => (
               <tr
                 key={rowKey(row, index)}
                 className={clsx(
-                  onRowClick && styles.clickable,
-                  isRowSelected?.(row) && styles.selected
+                  'last:[&>td]:border-b-0',
+                  onRowClick && 'cursor-pointer hover:[&>td]:bg-surface-hover',
+                  isRowSelected?.(row) && '[&>td]:bg-accent-weak'
                 )}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
@@ -89,8 +112,10 @@ export function DataTable<Row>({
                   <td
                     key={column.key}
                     className={clsx(
-                      column.numeric && styles.numeric,
-                      column.center && styles.center
+                      BODY_CELL,
+                      density,
+                      !compact && 'h-[var(--row-height)]',
+                      align(column)
                     )}
                   >
                     {column.render(row, index)}
@@ -100,7 +125,7 @@ export function DataTable<Row>({
             ))
           )}
         </tbody>
-        {footer && <tfoot>{footer}</tfoot>}
+        {footer && <tfoot className={FOOTER_ROW}>{footer}</tfoot>}
       </table>
     </div>
   )
@@ -115,17 +140,18 @@ export function PrimaryCell({
   subtitle?: ReactNode
 }): JSX.Element {
   return (
-    <span className={styles.primaryCell}>
-      <strong>{title}</strong>
-      {subtitle && <span>{subtitle}</span>}
+    <span className="flex flex-col gap-px py-1 leading-[1.35]">
+      <strong className="font-medium">{title}</strong>
+      {subtitle && <span className="text-caption text-ink-subtle">{subtitle}</span>}
     </span>
   )
 }
 
 export function RowActions({ children }: { children: ReactNode }): JSX.Element {
-  return <div className={styles.actionsCell}>{children}</div>
+  return <div className="flex justify-end gap-1">{children}</div>
 }
 
+/** Secondary information inside a cell: a SKU under a product name, and so on. */
 export function MutedCell({ children }: { children: ReactNode }): JSX.Element {
-  return <span className={styles.muted}>{children}</span>
+  return <span className="text-ink-muted">{children}</span>
 }

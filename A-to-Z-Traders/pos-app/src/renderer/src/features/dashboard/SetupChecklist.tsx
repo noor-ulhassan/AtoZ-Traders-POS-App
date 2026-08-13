@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import type { DatabaseInfo, Settings } from '@shared/types'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
 import { Icon } from '../../components/icons/Icon'
-import styles from './DashboardPage.module.css'
 
 interface SetupChecklistProps {
   settings: Settings
@@ -64,21 +63,28 @@ export function SetupChecklist({ settings, info }: SetupChecklistProps): JSX.Ele
         subtitle={`${remaining} step${remaining === 1 ? '' : 's'} left`}
       />
       <CardBody>
-        <div className={styles.setup}>
+        <div className="flex flex-col gap-4">
           {steps.map((step, index) => (
-            <div key={step.title} className={styles.setupStep}>
-              <span className={clsx(styles.setupIndex, step.done && styles.setupDone)}>
+            <div key={step.title} className="flex items-start gap-3">
+              <span
+                className={clsx(
+                  'grid size-[22px] shrink-0 place-items-center rounded-full border text-micro font-bold',
+                  step.done
+                    ? 'border-good-border bg-good-weak text-good'
+                    : 'border-accent-border bg-accent-weak text-accent-ink'
+                )}
+              >
                 {step.done ? <Icon name="check" size={12} /> : index + 1}
               </span>
-              <span className={styles.setupText}>
+              <span className="flex flex-col gap-[2px]">
                 {step.done ? (
-                  <span className={styles.setupTitle}>{step.title}</span>
+                  <span className="text-sm font-medium">{step.title}</span>
                 ) : (
-                  <Link to={step.to} className={styles.setupTitle}>
+                  <Link to={step.to} className="text-sm font-medium">
                     {step.title}
                   </Link>
                 )}
-                <span className={styles.setupHint}>{step.hint}</span>
+                <span className="text-caption text-ink-muted">{step.hint}</span>
               </span>
             </div>
           ))}

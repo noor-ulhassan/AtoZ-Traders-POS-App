@@ -3,9 +3,15 @@ import type { JSX, ReactNode } from 'react'
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '../icons/Icon'
-import styles from './Toast.module.css'
 
 type ToastKind = 'success' | 'error' | 'info'
+
+/** The left rail carries the meaning; the rest of the card stays neutral. */
+const RAIL: Record<ToastKind, string> = {
+  success: 'border-l-good',
+  error: 'border-l-bad',
+  info: 'border-l-accent'
+}
 
 interface Toast {
   id: number
@@ -60,16 +66,30 @@ export function ToastProvider({ children }: { children: ReactNode }): JSX.Elemen
     <ToastContext.Provider value={api}>
       {children}
       {createPortal(
-        <div className={styles.viewport} role="status" aria-live="polite">
+        <div
+          className="pointer-events-none fixed right-6 bottom-6 z-200 flex w-[380px] max-w-[calc(100vw-48px)] flex-col gap-2"
+          role="status"
+          aria-live="polite"
+        >
           {toasts.map((toast) => (
-            <div key={toast.id} className={clsx(styles.toast, styles[toast.kind])}>
-              <div className={styles.body}>
-                <span className={styles.title}>{toast.title}</span>
-                {toast.message && <span className={styles.message}>{toast.message}</span>}
+            <div
+              key={toast.id}
+              className={clsx(
+                'pointer-events-auto flex animate-slide-in items-start gap-3 rounded-md border border-line border-l-[3px] bg-paper px-4 py-3 shadow-popover',
+                RAIL[toast.kind]
+              )}
+            >
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm font-semibold">{toast.title}</span>
+                {toast.message && (
+                  <span className="text-caption leading-normal break-words text-ink-muted">
+                    {toast.message}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
-                className={styles.dismiss}
+                className="shrink-0 rounded-sm p-0.5 text-ink-subtle hover:bg-surface-active hover:text-ink"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Dismiss"
               >

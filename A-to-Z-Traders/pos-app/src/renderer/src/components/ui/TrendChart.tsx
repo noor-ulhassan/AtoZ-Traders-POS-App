@@ -2,7 +2,6 @@ import type { JSX } from 'react'
 import { useMemo, useState } from 'react'
 import type { SalesSummaryPoint } from '@shared/types'
 import { dayMonth, money, moneyRounded } from '../../lib/format'
-import styles from './TrendChart.module.css'
 
 interface TrendChartProps {
   points: SalesSummaryPoint[]
@@ -11,6 +10,9 @@ interface TrendChartProps {
 
 const PADDING = { top: 12, right: 12, bottom: 22, left: 48 }
 const VIEW_WIDTH = 720
+
+/** Axis text is below the app's smallest type token — it is chrome, not copy. */
+const AXIS_LABEL = 'fill-ink-subtle font-ui text-[10px] tabular-nums'
 
 /**
  * Sales over the selected range.
@@ -51,7 +53,11 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
   }, [points, height])
 
   if (points.length === 0) {
-    return <div className={styles.empty}>No sales in this period.</div>
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-ink-subtle">
+        No sales in this period.
+      </div>
+    )
   }
 
   // Label density: every day on a week, roughly six labels on a long range.
@@ -59,9 +65,9 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
   const hovered = hoverIndex === null ? null : points[hoverIndex]
 
   return (
-    <div className={styles.wrap}>
+    <div className="relative w-full">
       <svg
-        className={styles.svg}
+        className="block h-auto w-full overflow-visible"
         viewBox={`0 0 ${VIEW_WIDTH} ${height}`}
         preserveAspectRatio="none"
         role="img"
@@ -77,14 +83,14 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
         {chart.gridValues.map((value) => (
           <g key={value}>
             <line
-              className={styles.grid}
+              className="stroke-line stroke-1"
               x1={PADDING.left}
               x2={VIEW_WIDTH - PADDING.right}
               y1={chart.y(value)}
               y2={chart.y(value)}
             />
             <text
-              className={styles.axisLabel}
+              className={AXIS_LABEL}
               x={PADDING.left - 8}
               y={chart.y(value) + 3}
               textAnchor="end"
@@ -98,7 +104,7 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
           index % labelStep === 0 || index === points.length - 1 ? (
             <text
               key={point.date}
-              className={styles.axisLabel}
+              className={AXIS_LABEL}
               x={chart.x(index)}
               y={height - 6}
               textAnchor="middle"
@@ -108,12 +114,15 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
           ) : null
         )}
 
-        <path className={styles.area} d={chart.area} />
-        <polyline className={styles.line} points={chart.line} />
+        <path className="fill-[url(#trendFill)]" d={chart.area} />
+        <polyline
+          className="fill-none stroke-accent [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.75]"
+          points={chart.line}
+        />
 
         {/* The most recent day is the one the owner is actually asking about. */}
         <circle
-          className={styles.endpoint}
+          className="fill-accent stroke-paper stroke-2"
           cx={chart.x(points.length - 1)}
           cy={chart.y(points[points.length - 1]?.sales ?? 0)}
           r="4"
@@ -122,14 +131,14 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
         {hoverIndex !== null && (
           <g>
             <line
-              className={styles.hoverLine}
+              className="stroke-ink-subtle stroke-1 [stroke-dasharray:3_3]"
               x1={chart.x(hoverIndex)}
               x2={chart.x(hoverIndex)}
               y1={PADDING.top}
               y2={PADDING.top + chart.innerHeight}
             />
             <circle
-              className={styles.hoverDot}
+              className="fill-paper stroke-accent stroke-2"
               cx={chart.x(hoverIndex)}
               cy={chart.y(points[hoverIndex]?.sales ?? 0)}
               r="4"
@@ -138,7 +147,7 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
         )}
 
         <rect
-          className={styles.hitArea}
+          className="cursor-crosshair fill-transparent"
           x={PADDING.left}
           y={PADDING.top}
           width={chart.innerWidth}
@@ -155,27 +164,27 @@ export function TrendChart({ points, height = 200 }: TrendChartProps): JSX.Eleme
 
       {hovered && (
         <div
-          className={styles.tooltip}
+          className="pointer-events-none absolute z-5 -translate-x-1/2 -translate-y-full rounded-md border border-line-strong bg-paper px-3 py-2 text-caption whitespace-nowrap shadow-popover"
           style={{
             left: `${(chart.x(hoverIndex as number) / VIEW_WIDTH) * 100}%`,
             top: `${(chart.y(hovered.sales) / height) * 100 - 4}%`
           }}
         >
-          <div className={styles.tooltipDate}>{dayMonth(hovered.date)}</div>
-          <div className={styles.tooltipRow}>
-            <span>Sales</span>
-            <strong>{money(hovered.sales)}</strong>
-          </div>
-          <div className={styles.tooltipRow}>
-            <span>Profit</span>
-            <strong>{money(hovered.profit)}</strong>
-          </div>
-          <div className={styles.tooltipRow}>
-            <span>Bills</span>
-            <strong>{hovered.billCount}</strong>
-          </div>
+          <div className="mb-0.5 font-semibold">{dayMonth(hovered.date)}</div>
+          <TooltipRow label="Sales" value={money(hovered.sales)} />
+          <TooltipRow label="Profit" value={money(hovered.profit)} />
+          <TooltipRow label="Bills" value={hovered.billCount} />
         </div>
       )}
+    </div>
+  )
+}
+
+function TooltipRow({ label, value }: { label: string; value: string | number }): JSX.Element {
+  return (
+    <div className="flex justify-between gap-4 tabular-nums text-ink-muted">
+      <span>{label}</span>
+      <strong className="font-medium text-ink">{value}</strong>
     </div>
   )
 }

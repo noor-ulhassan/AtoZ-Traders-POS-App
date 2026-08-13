@@ -9,7 +9,7 @@ import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
@@ -18,7 +18,6 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { PurchaseDetailModal } from './PurchaseDetailModal'
-import styles from './PurchasesPage.module.css'
 
 export function PurchasesPage(): JSX.Element {
   const currency = useCurrency()
@@ -138,7 +137,7 @@ export function PurchasesPage(): JSX.Element {
       </FilterBar>
 
       <PageBody>
-        <div className={styles.tiles}>
+        <StatGrid>
           <StatTile label="Purchases in period" unit={currency} value={format.money(total)} />
           <StatTile
             label="Still owed on these"
@@ -147,7 +146,7 @@ export function PurchasesPage(): JSX.Element {
             tone={unpaid > 0 ? 'bad' : 'default'}
           />
           <StatTile label="Bills recorded" value={rows.length} />
-        </div>
+        </StatGrid>
 
         <Card>
           <CardBody flush>

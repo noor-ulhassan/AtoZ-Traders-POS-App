@@ -8,7 +8,7 @@ import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell, RowActions } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useMutation } from '../../hooks/useMutation'
@@ -18,7 +18,6 @@ import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { PartyPickerModal } from './PartyPickerModal'
 import { PaymentModal } from '../parties/PaymentModal'
-import styles from './PaymentsPage.module.css'
 
 type Filter = PartyType | 'all'
 
@@ -169,7 +168,7 @@ export function PaymentsPage(): JSX.Element {
       </FilterBar>
 
       <PageBody>
-        <div className={styles.tiles}>
+        <StatGrid>
           <StatTile label="Received" unit={currency} value={format.money(received)} tone="good" />
           <StatTile label="Paid out" unit={currency} value={format.money(paid)} tone="bad" />
           <StatTile
@@ -178,7 +177,7 @@ export function PaymentsPage(): JSX.Element {
             value={format.money(received - paid)}
             tone={received - paid < 0 ? 'bad' : 'good'}
           />
-        </div>
+        </StatGrid>
 
         <Card>
           <CardBody flush>

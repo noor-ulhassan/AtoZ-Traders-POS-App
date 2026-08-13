@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import type { JSX } from 'react'
 import type { Receipt } from '@shared/types'
 import { Button } from '../../components/ui/Button'
@@ -6,7 +7,18 @@ import { Modal } from '../../components/ui/Modal'
 import { useMutation } from '../../hooks/useMutation'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
-import styles from './ReceiptModal.module.css'
+
+/* The receipt preview mirrors a printed roll: a narrow, centred column with
+   monospaced figures, so what is on screen is what comes out of the printer.
+   The repeated row and cell classes are named here rather than written inline
+   at each use — a receipt is a stack of near-identical rows, and a single
+   drifting copy is immediately visible. */
+
+const RULE = 'my-3 border-t border-dashed border-line-strong'
+const ROW = 'flex justify-between gap-3'
+const LABEL = 'text-ink-muted'
+const HEAD = 'pb-[2px] text-[10px] font-semibold tracking-[0.05em] text-ink-subtle uppercase'
+const CELL = 'py-[2px] align-top'
 
 interface ReceiptModalProps {
   receipt: Receipt | null
@@ -60,113 +72,120 @@ export function ReceiptModal({
       }
     >
       {justSaved && (
-        <div className={styles.savedBanner}>
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-good-border bg-good-weak px-4 py-3 font-ui text-sm font-medium text-good">
           <Icon name="check" size={16} />
           Bill saved. Stock and balances have been updated.
         </div>
       )}
 
-      <div className={styles.paper} data-selectable>
-        <div className={styles.business}>
+      <div
+        className="mx-auto w-full max-w-[380px] rounded-md border border-line bg-paper p-5 font-mono text-[12px] leading-[1.5] text-ink"
+        data-selectable
+      >
+        <div className="mb-3 text-center">
           {receipt.business.name && (
-            <div className={styles.businessName}>{receipt.business.name}</div>
+            <div className="font-display text-md font-semibold tracking-[-0.01em]">
+              {receipt.business.name}
+            </div>
           )}
           {receipt.business.address && (
-            <div className={styles.businessLine}>{receipt.business.address}</div>
+            <div className="text-[11px] text-ink-muted">{receipt.business.address}</div>
           )}
           {receipt.business.phone && (
-            <div className={styles.businessLine}>{receipt.business.phone}</div>
+            <div className="text-[11px] text-ink-muted">{receipt.business.phone}</div>
           )}
           {receipt.business.taxNumber && (
-            <div className={styles.businessLine}>NTN {receipt.business.taxNumber}</div>
+            <div className="text-[11px] text-ink-muted">NTN {receipt.business.taxNumber}</div>
           )}
         </div>
 
-        <hr className={styles.rule} />
+        <hr className={RULE} />
 
-        <div className={styles.meta}>
-          <span className={styles.metaLabel}>Invoice</span>
+        <div className={ROW}>
+          <span className={LABEL}>Invoice</span>
           <span>{receipt.invoiceNo}</span>
         </div>
-        <div className={styles.meta}>
-          <span className={styles.metaLabel}>Date</span>
+        <div className={ROW}>
+          <span className={LABEL}>Date</span>
           <span>{format.date(receipt.date)}</span>
         </div>
-        <div className={styles.meta}>
-          <span className={styles.metaLabel}>Customer</span>
+        <div className={ROW}>
+          <span className={LABEL}>Customer</span>
           <span>{receipt.customer?.name ?? 'Walk-in'}</span>
         </div>
 
-        <hr className={styles.rule} />
+        <hr className={RULE} />
 
-        <table className={styles.items}>
+        <table className="my-2 w-full">
           <thead>
             <tr>
-              <th>Item</th>
-              <th className={styles.right}>Qty</th>
-              <th className={styles.right}>Rate</th>
-              <th className={styles.right}>Amount</th>
+              <th className={clsx(HEAD, 'text-left')}>Item</th>
+              <th className={clsx(HEAD, 'text-right')}>Qty</th>
+              <th className={clsx(HEAD, 'text-right')}>Rate</th>
+              <th className={clsx(HEAD, 'text-right')}>Amount</th>
             </tr>
           </thead>
           <tbody>
             {receipt.lines.map((line, index) => (
               <tr key={index}>
-                <td className={styles.itemName}>
+                <td className={clsx(CELL, 'pr-2')}>
                   {line.name}
-                  <div style={{ color: 'var(--ink-subtle)', fontSize: 10 }}>{line.unitName}</div>
+                  <div className="text-[10px] text-ink-subtle">{line.unitName}</div>
                 </td>
-                <td className={styles.right}>{format.quantity(line.qty)}</td>
-                <td className={styles.right}>{amount(line.rate)}</td>
-                <td className={styles.right}>{amount(line.amount)}</td>
+                <td className={clsx(CELL, 'text-right')}>{format.quantity(line.qty)}</td>
+                <td className={clsx(CELL, 'text-right')}>{amount(line.rate)}</td>
+                <td className={clsx(CELL, 'text-right')}>{amount(line.amount)}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <hr className={styles.rule} />
+        <hr className={RULE} />
 
-        <div className={styles.totals}>
-          <div className={styles.totalRow}>
-            <span className={styles.metaLabel}>Subtotal</span>
+        <div className="flex flex-col gap-[2px]">
+          <div className={ROW}>
+            <span className={LABEL}>Subtotal</span>
             <span>{amount(receipt.totals.subtotal)}</span>
           </div>
           {receipt.totals.discount > 0 && (
-            <div className={styles.totalRow}>
-              <span className={styles.metaLabel}>Discount</span>
+            <div className={ROW}>
+              <span className={LABEL}>Discount</span>
               <span>− {amount(receipt.totals.discount)}</span>
             </div>
           )}
           {receipt.totals.tax > 0 && (
-            <div className={styles.totalRow}>
-              <span className={styles.metaLabel}>{receipt.totals.taxLabel}</span>
+            <div className={ROW}>
+              <span className={LABEL}>{receipt.totals.taxLabel}</span>
               <span>{amount(receipt.totals.tax)}</span>
             </div>
           )}
-          <div className={`${styles.totalRow} ${styles.grand}`}>
+          <div className={clsx(ROW, 'mt-2 border-t border-ink pt-2 text-[14px] font-bold')}>
             <span>TOTAL {receipt.currency}</span>
             <span>{amount(receipt.totals.total)}</span>
           </div>
-          <div className={styles.totalRow}>
-            <span className={styles.metaLabel}>Paid</span>
+          <div className={ROW}>
+            <span className={LABEL}>Paid</span>
             <span>{amount(receipt.totals.paid)}</span>
           </div>
           {receipt.totals.balance > 0 && (
-            <div className={styles.totalRow}>
-              <span className={styles.metaLabel}>Balance due</span>
+            <div className={ROW}>
+              <span className={LABEL}>Balance due</span>
               <span>{amount(receipt.totals.balance)}</span>
             </div>
           )}
           {receipt.customer && receipt.customer.balanceAfter !== null && (
-            <div className={styles.totalRow}>
-              <span className={styles.metaLabel}>Total outstanding</span>
+            <div className={ROW}>
+              <span className={LABEL}>Total outstanding</span>
               <span>{amount(receipt.customer.balanceAfter)}</span>
             </div>
           )}
         </div>
 
-        <div className={styles.words}>{receipt.amountInWords}</div>
+        <div className="mt-3 text-center text-[11px] text-ink-muted">{receipt.amountInWords}</div>
 
-        {receipt.footer && <div className={styles.footer}>{receipt.footer}</div>}
+        {receipt.footer && (
+          <div className="mt-3 text-center text-[11px] text-ink-muted">{receipt.footer}</div>
+        )}
       </div>
     </Modal>
   )

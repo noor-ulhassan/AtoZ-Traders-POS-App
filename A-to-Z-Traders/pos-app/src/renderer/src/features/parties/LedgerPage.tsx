@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Card, CardBody } from '../../components/ui/Surface'
 import { Column, DataTable } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
@@ -15,7 +15,6 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { PaymentModal } from './PaymentModal'
-import styles from './LedgerPage.module.css'
 
 interface LedgerPageProps {
   partyType: PartyType
@@ -67,7 +66,7 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
       key: 'reference',
       header: 'Reference',
       width: '140px',
-      render: (row) => <span className={styles.reference}>{row.reference}</span>
+      render: (row) => <span className="font-mono text-caption text-ink-muted">{row.reference}</span>
     },
     {
       key: 'debit',
@@ -136,7 +135,7 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
       </FilterBar>
 
       <PageBody>
-        <div className={styles.tiles}>
+        <StatGrid min={200}>
           <StatTile
             label="Current balance"
             unit={currency}
@@ -160,7 +159,7 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
             unit={currency}
             value={format.money(data?.totalCredit ?? 0)}
           />
-        </div>
+        </StatGrid>
 
         <Card>
           <CardBody flush>
@@ -177,9 +176,9 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
                 data && data.entries.length > 0 ? (
                   <tr>
                     <td colSpan={3}>Closing balance</td>
-                    <td className={styles.numeric}>{format.money(data.totalDebit)}</td>
-                    <td className={styles.numeric}>{format.money(data.totalCredit)}</td>
-                    <td className={styles.numeric}>{format.money(data.closingBalance)}</td>
+                    <td className="text-right tabular-nums">{format.money(data.totalDebit)}</td>
+                    <td className="text-right tabular-nums">{format.money(data.totalCredit)}</td>
+                    <td className="text-right tabular-nums">{format.money(data.closingBalance)}</td>
                   </tr>
                 ) : undefined
               }

@@ -5,6 +5,16 @@
    here. Components never hard-code a hex value — that is what makes the dark
    palette below a single block rather than an audit of every stylesheet.
 
+   base.css binds these to Tailwind's utility namespaces with `@theme inline`,
+   so `bg-surface-raised` compiles down to `var(--surface-raised)` and the dark
+   palette keeps working by redefining one variable.
+
+   Names here deliberately avoid Tailwind's own namespace prefixes
+   (`--color-*`, `--font-*`, `--text-*`, `--shadow-*`, `--leading-*`,
+   `--radius-*`): a token sharing a name with the namespace it feeds would be
+   circular. Spacing and radius have no tokens at all — Tailwind's 4px scale
+   and default radii already are the scale this app was built on.
+
    Palette: cool paper and ink, with a deep steel-blue accent. Semantic
    colours (money in, money due, attention) are deliberately separate from the
    accent so "this needs your attention" never reads as "this is selected".
@@ -64,44 +74,27 @@
   --focus-ring-tight: 0 0 0 2px var(--accent);
 
   /* ---- elevation: reserved for things that float above the page */
-  --shadow-popover: 0 4px 12px rgb(16 24 32 / 10%), 0 1px 3px rgb(16 24 32 / 8%);
-  --shadow-modal: 0 16px 48px rgb(16 24 32 / 18%), 0 2px 8px rgb(16 24 32 / 10%);
-
-  /* ---- spacing: 4px base */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-
-  /* ---- radii */
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 8px;
-  --radius-pill: 999px;
+  --elevation-popover: 0 4px 12px rgb(16 24 32 / 10%), 0 1px 3px rgb(16 24 32 / 8%);
+  --elevation-modal: 0 16px 48px rgb(16 24 32 / 18%), 0 2px 8px rgb(16 24 32 / 10%);
 
   /* ---- type */
-  --font-ui:
+  --family-ui:
     'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-  --font-display:
+  --family-display:
     'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'Cascadia Mono', 'Consolas', ui-monospace, 'Courier New', monospace;
+  --family-mono: 'Cascadia Mono', 'Consolas', ui-monospace, 'Courier New', monospace;
 
-  --text-micro: 11px;
-  --text-caption: 12px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 20px;
-  --text-xl: 28px;
-  --text-2xl: 34px;
+  --fs-micro: 11px;
+  --fs-caption: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 28px;
+  --fs-2xl: 34px;
 
-  --leading-tight: 1.25;
-  --leading-normal: 1.5;
+  --lh-tight: 1.25;
+  --lh-normal: 1.5;
 
   /* ---- layout */
   --sidebar-width: 232px;
@@ -162,8 +155,8 @@
 
     --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
 
-    --shadow-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
-    --shadow-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
+    --elevation-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
+    --elevation-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
 
     color-scheme: dark;
   }
@@ -215,8 +208,8 @@
   --nav-active: #1e2732;
   --nav-line: #1c232c;
 
-  --shadow-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
-  --shadow-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
+  --elevation-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
+  --elevation-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
 
   color-scheme: dark;
 }

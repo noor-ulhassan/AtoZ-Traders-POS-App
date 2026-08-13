@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import type { JSX } from 'react'
 import type { ProductUnitInput } from '@shared/types'
 import { money } from '@shared/money'
@@ -5,7 +6,11 @@ import { Button } from '../../components/ui/Button'
 import { Input, NumberInput } from '../../components/ui/Field'
 import { useCurrency } from '../../app/SettingsContext'
 import * as format from '../../lib/format'
-import styles from './UnitsEditor.module.css'
+
+/* The header and the rows under it are one grid repeated, so the column widths
+   are named once — a header that drifts out of line with its rows is the whole
+   point of having a header. */
+const ROW_GRID = 'grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_34px] gap-2'
 
 interface UnitsEditorProps {
   baseUnit: string
@@ -46,17 +51,19 @@ export function UnitsEditor({
   }
 
   return (
-    <div className={styles.wrap}>
-      <p className={styles.hint}>
+    <div className="flex flex-col gap-2">
+      <p className="text-caption leading-normal text-ink-subtle">
         Stock is always counted in {baseUnit || 'the base unit'}. Add a larger unit here if you also
         sell by the box, dozen or bag.
       </p>
 
       {units.length === 0 ? (
-        <div className={styles.empty}>Sold only by the {baseUnit || 'base unit'}.</div>
+        <div className="rounded-md border border-dashed border-line-strong p-4 text-center text-sm text-ink-subtle">
+          Sold only by the {baseUnit || 'base unit'}.
+        </div>
       ) : (
         <>
-          <div className={styles.headerRow}>
+          <div className={clsx(ROW_GRID, 'text-caption font-medium text-ink-muted')}>
             <span>Unit name</span>
             <span>Contains ({baseUnit || 'base'})</span>
             <span>Price per unit</span>
@@ -65,7 +72,7 @@ export function UnitsEditor({
 
           {units.map((unit, index) => (
             <div key={index}>
-              <div className={styles.row}>
+              <div className={clsx(ROW_GRID, 'items-center')}>
                 <Input
                   value={unit.unitName}
                   placeholder="box"
@@ -91,7 +98,7 @@ export function UnitsEditor({
                 />
               </div>
               {unit.unitName && unit.factor > 0 && (
-                <div className={styles.equivalence}>
+                <div className="pl-[2px] text-caption text-ink-muted">
                   1 {unit.unitName} = {format.quantity(unit.factor)} {baseUnit} · sells at{' '}
                   {currency} {format.money(unit.salePrice ?? money(basePrice * unit.factor))}
                   {unit.salePrice === null && ' (follows the base price)'}

@@ -1,4 +1,5 @@
-import type { JSX } from 'react'
+import clsx from 'clsx'
+import type { JSX, ReactNode } from 'react'
 import { useState } from 'react'
 import type { Settings } from '@shared/types'
 import { Button } from '../../components/ui/Button'
@@ -13,7 +14,35 @@ import { useToast } from '../../components/ui/Toast'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useSettings } from '../../app/SettingsContext'
-import styles from './SettingsPage.module.css'
+
+interface InfoRowProps {
+  label: string
+  /** Renders the value as a path or code, in the monospace face. */
+  mono?: boolean
+  /** Allows the value to be selected and copied, e.g. the database path. */
+  selectable?: boolean
+  children: ReactNode
+}
+
+/**
+ * A label/value line in the database card.
+ *
+ * Values here can be a long Windows path, so they break inside the word rather
+ * than forcing the card wider than the column it sits in.
+ */
+function InfoRow({ label, mono, selectable, children }: InfoRowProps): JSX.Element {
+  return (
+    <div className="flex justify-between gap-4 py-2 text-sm not-first:border-t not-first:border-line">
+      <span className="text-ink-muted">{label}</span>
+      <span
+        className={clsx('text-right tabular-nums break-all', mono && 'font-mono text-caption')}
+        data-selectable={selectable || undefined}
+      >
+        {children}
+      </span>
+    </div>
+  )
+}
 
 export function SettingsPage(): JSX.Element {
   const { settings, save: persist } = useSettings()
@@ -86,8 +115,8 @@ export function SettingsPage(): JSX.Element {
       />
 
       <PageBody>
-        <div className={styles.layout}>
-          <div className={styles.stack}>
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start gap-5">
+          <div className="flex flex-col gap-5">
             <Card>
               <CardHeader
                 title="Business details"
@@ -190,7 +219,7 @@ export function SettingsPage(): JSX.Element {
             </Card>
           </div>
 
-          <div className={styles.stack}>
+          <div className="flex flex-col gap-5">
             <Card>
               <CardHeader
                 title="Backups"
@@ -202,7 +231,7 @@ export function SettingsPage(): JSX.Element {
                   your records survive. Take one at the end of every day.
                 </Callout>
 
-                <div className={styles.backupButtons}>
+                <div className="mt-4 flex gap-2">
                   <Button
                     variant="primary"
                     icon="backup"
@@ -221,13 +250,13 @@ export function SettingsPage(): JSX.Element {
                   </Button>
                 </div>
 
-                <div style={{ marginTop: 'var(--space-5)' }}>
+                <div className="mt-5">
                   <Field
                     label="Automatic backup folder"
                     hint="Leave empty to turn off. A copy is written here each time you close the app."
                   >
                     <Input
-                      className={styles.path}
+                      className="font-mono"
                       value={form.autoBackupDir}
                       placeholder="D:\POS-backups"
                       onChange={(event) => set('autoBackupDir', event.target.value)}
@@ -240,44 +269,18 @@ export function SettingsPage(): JSX.Element {
             <Card>
               <CardHeader title="This database" />
               <CardBody>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>File</span>
-                  <span className={`${styles.infoValue} ${styles.path}`} data-selectable>
-                    {info.data?.path ?? '—'}
-                  </span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Size</span>
-                  <span className={styles.infoValue}>
-                    {info.data ? format.fileSize(info.data.size) : '—'}
-                  </span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Schema version</span>
-                  <span className={styles.infoValue}>{info.data?.schemaVersion ?? '—'}</span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Products</span>
-                  <span className={styles.infoValue}>{info.data?.counts.products ?? 0}</span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Customers</span>
-                  <span className={styles.infoValue}>{info.data?.counts.customers ?? 0}</span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Suppliers</span>
-                  <span className={styles.infoValue}>{info.data?.counts.suppliers ?? 0}</span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Bills</span>
-                  <span className={styles.infoValue}>{info.data?.counts.sales ?? 0}</span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Purchases</span>
-                  <span className={styles.infoValue}>{info.data?.counts.purchases ?? 0}</span>
-                </div>
+                <InfoRow label="File" mono selectable>
+                  {info.data?.path ?? '—'}
+                </InfoRow>
+                <InfoRow label="Size">{info.data ? format.fileSize(info.data.size) : '—'}</InfoRow>
+                <InfoRow label="Schema version">{info.data?.schemaVersion ?? '—'}</InfoRow>
+                <InfoRow label="Products">{info.data?.counts.products ?? 0}</InfoRow>
+                <InfoRow label="Customers">{info.data?.counts.customers ?? 0}</InfoRow>
+                <InfoRow label="Suppliers">{info.data?.counts.suppliers ?? 0}</InfoRow>
+                <InfoRow label="Bills">{info.data?.counts.sales ?? 0}</InfoRow>
+                <InfoRow label="Purchases">{info.data?.counts.purchases ?? 0}</InfoRow>
 
-                <div className={styles.actions}>
+                <div className="mt-5 flex gap-2 border-t border-line pt-4">
                   <Button size="sm" onClick={() => info.refetch()}>
                     Refresh
                   </Button>
