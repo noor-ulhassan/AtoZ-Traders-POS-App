@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { IpcChannel } from '@shared/ipc'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type { IpcResult } from '@shared/types'
+import { isUnlocked } from '../auth/session'
 import { AppError, translateSqliteError } from '../utils/errors'
 import { logger } from '../utils/logger'
 
@@ -49,14 +50,34 @@ function toResult(error: unknown, channel: string): IpcResult<never> {
   }
 }
 
+/** The auth error the guard returns for a locked session (see errors.ts AUTH). */
+const LOCKED_RESULT: IpcResult<never> = {
+  ok: false,
+  error: { code: 'AUTH', message: 'Please unlock the app to continue.' }
+}
+
+export interface HandlerOptions {
+  /**
+   * When true the channel runs even while the app is locked. Reserved for the
+   * auth channels themselves — logging in is impossible if login is gated on
+   * being logged in. Every other channel is guarded (Guide §1.3).
+   */
+  public?: boolean
+}
+
 /**
- * Registers a thin IPC handler: validate input, call the service, wrap the
- * result. Handlers hold no business logic (Guide §1.3).
+ * Registers a thin IPC handler: enforce the lock, validate input, call the
+ * service, wrap the result. Handlers hold no business logic.
+ *
+ * The lock is enforced here, in the main process, rather than by hiding
+ * screens in the renderer — a channel invoked from a compromised or scripted
+ * renderer still gets nothing back until the session is unlocked.
  */
 export function registerHandler<Schema extends z.ZodTypeAny, Output>(
   channel: IpcChannel,
   schema: Schema,
-  service: (input: z.infer<Schema>) => Output | Promise<Output>
+  service: (input: z.infer<Schema>) => Output | Promise<Output>,
+  options: HandlerOptions = {}
 ): void {
   if (registered.has(channel)) {
     throw new Error(`IPC channel "${channel}" is registered twice.`)
@@ -64,6 +85,11 @@ export function registerHandler<Schema extends z.ZodTypeAny, Output>(
   registered.add(channel)
 
   ipcMain.handle(channel, async (_event, payload: unknown): Promise<IpcResult<Output>> => {
+    if (!options.public && !isUnlocked()) {
+      log.warn(`${channel} blocked: app is locked`)
+      return LOCKED_RESULT
+    }
+
     const parsed = schema.safeParse(payload)
     if (!parsed.success) {
       const error = validationError(parsed.error)

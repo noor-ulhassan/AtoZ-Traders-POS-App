@@ -1,4 +1,3 @@
-import clsx from 'clsx'
 import type { JSX } from 'react'
 import { useState } from 'react'
 import type {
@@ -14,7 +13,8 @@ import { ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
 import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
-import { StatTile } from '../../components/ui/StatTile'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { TrendChart } from '../../components/ui/TrendChart'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useMutation } from '../../hooks/useMutation'
@@ -23,7 +23,6 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { ProfitLossReportView } from './ProfitLossReportView'
-import styles from './ReportsPage.module.css'
 
 type TabKey = 'profit-loss' | 'sales' | 'products' | 'stock' | 'reorder'
 
@@ -74,20 +73,13 @@ export function ReportsPage(): JSX.Element {
       />
 
       <FilterBar>
-        <div className={styles.tabs} role="tablist">
-          {TABS.map((entry) => (
-            <button
-              key={entry.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === entry.key}
-              className={clsx(styles.tab, tab === entry.key && styles.tabActive)}
-              onClick={() => setTab(entry.key)}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Report"
+          tabs
+          value={tab}
+          onChange={setTab}
+          options={TABS.map((entry) => ({ value: entry.key, label: entry.label }))}
+        />
         {active.needsRange && <DateRangeFilter value={range} onChange={setRange} />}
         <FilterSpacer />
       </FilterBar>
@@ -111,7 +103,7 @@ function SalesTrendView({ range, currency }: { range: DateRange; currency: strin
 
   return (
     <>
-      <div className={styles.tiles}>
+      <StatGrid min={200}>
         <StatTile label="Sales" unit={currency} value={format.money(data?.totalSales ?? 0)} />
         <StatTile
           label="Profit"
@@ -125,7 +117,7 @@ function SalesTrendView({ range, currency }: { range: DateRange; currency: strin
           unit={currency}
           value={format.money(data?.averageBill ?? 0)}
         />
-      </div>
+      </StatGrid>
 
       <Card>
         <CardHeader
@@ -263,7 +255,7 @@ function StockValuationView({ currency }: { currency: string }): JSX.Element {
 
   return (
     <>
-      <div className={styles.tiles}>
+      <StatGrid min={200}>
         <StatTile
           label="Stock at cost"
           unit={currency}
@@ -282,7 +274,7 @@ function StockValuationView({ currency }: { currency: string }): JSX.Element {
           tone="good"
           footnote="At today's list prices"
         />
-      </div>
+      </StatGrid>
 
       <Card>
         <CardHeader

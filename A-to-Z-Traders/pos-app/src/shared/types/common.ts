@@ -22,7 +22,7 @@ export interface DateRange {
 }
 
 export type ErrorCode =
-  'VALIDATION' | 'NOT_FOUND' | 'CONFLICT' | 'BUSINESS_RULE' | 'INTERNAL' | 'CANCELLED'
+  'VALIDATION' | 'NOT_FOUND' | 'CONFLICT' | 'BUSINESS_RULE' | 'INTERNAL' | 'CANCELLED' | 'AUTH'
 
 export interface IpcError {
   code: ErrorCode

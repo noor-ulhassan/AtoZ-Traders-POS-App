@@ -73,7 +73,7 @@ export function StockLedgerPage(): JSX.Element {
       width: '140px',
       render: (row) =>
         row.refId ? (
-          <span style={{ color: 'var(--ink-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+          <span className="font-mono text-caption text-ink-muted">
             {row.refTable}#{row.refId}
           </span>
         ) : (

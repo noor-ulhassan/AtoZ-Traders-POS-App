@@ -1,4 +1,5 @@
 import { assertAllChannelsRegistered } from './registry'
+import { registerAuthHandlers } from './channels/auth.ipc'
 import { registerCatalogHandlers } from './channels/catalog.ipc'
 import { registerInsightsHandlers } from './channels/insights.ipc'
 import { registerMoneyHandlers } from './channels/money.ipc'
@@ -13,6 +14,7 @@ import { registerTradeHandlers } from './channels/trade.ipc'
  * failing silently the first time the owner opens that screen.
  */
 export function registerIpcHandlers(): void {
+  registerAuthHandlers()
   registerSettingsHandlers()
   registerCatalogHandlers()
   registerPartyHandlers()

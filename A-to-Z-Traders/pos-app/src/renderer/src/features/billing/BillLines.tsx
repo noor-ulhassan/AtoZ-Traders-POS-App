@@ -1,10 +1,10 @@
+import clsx from 'clsx'
 import type { JSX } from 'react'
 import { Button } from '../../components/ui/Button'
 import { NumberInput, Select } from '../../components/ui/Field'
 import { Column, DataTable } from '../../components/ui/DataTable'
 import * as format from '../../lib/format'
 import type { BillLine } from './useBill'
-import styles from './BillingPage.module.css'
 
 interface BillLinesProps {
   lines: BillLine[]
@@ -34,13 +34,8 @@ export function BillLines({
         const remaining = line.product.stockQty - line.qty * line.factor
         return (
           <div>
-            <div style={{ fontWeight: 500 }}>{line.product.name}</div>
-            <div
-              style={{
-                fontSize: 12,
-                color: remaining < 0 ? 'var(--bad)' : 'var(--ink-subtle)'
-              }}
-            >
+            <div className="font-medium">{line.product.name}</div>
+            <div className={clsx('text-caption', remaining < 0 ? 'text-bad' : 'text-ink-subtle')}>
               {remaining < 0
                 ? `Short by ${format.qtyWithUnit(-remaining, line.product.baseUnit)}`
                 : `${format.qtyWithUnit(remaining, line.product.baseUnit)} left after this`}
@@ -55,7 +50,7 @@ export function BillLines({
       width: '120px',
       render: (line) => (
         <Select
-          className={styles.unitSelect}
+          className="min-w-[100px]"
           value={line.unitName}
           onChange={(event) => onChangeUnit(line, event.target.value)}
         >
@@ -75,7 +70,6 @@ export function BillLines({
       width: '100px',
       render: (line) => (
         <NumberInput
-          className={styles.lineInput}
           value={line.qty}
           onValueChange={(value) => onUpdate(line.key, { qty: value })}
         />
@@ -87,12 +81,13 @@ export function BillLines({
       numeric: true,
       width: '170px',
       render: (line) => (
-        <div className={styles.rateCell}>
+        <div className="flex items-center justify-end gap-2">
           {PRICE_FLAG[line.priceSource] && (
-            <span className={styles.priceFlag}>{PRICE_FLAG[line.priceSource]}</span>
+            <span className="text-[10px] font-semibold tracking-[0.04em] text-accent uppercase whitespace-nowrap">
+              {PRICE_FLAG[line.priceSource]}
+            </span>
           )}
           <NumberInput
-            className={styles.lineInput}
             value={line.rate}
             onValueChange={(value) =>
               onUpdate(line.key, { rate: value, priceSource: 'unit_default' })
@@ -108,7 +103,6 @@ export function BillLines({
       width: '120px',
       render: (line) => (
         <NumberInput
-          className={styles.lineInput}
           value={line.lineDiscount}
           onValueChange={(value) => onUpdate(line.key, { lineDiscount: value })}
         />

@@ -29,6 +29,16 @@ async function invoke<T>(channel: IpcChannel, payload?: unknown): Promise<IpcRes
 }
 
 const api = {
+  auth: {
+    status: () => invoke(IPC_CHANNELS.authStatus),
+    setup: (input) => invoke(IPC_CHANNELS.authSetup, input),
+    login: (input) => invoke(IPC_CHANNELS.authLogin, input),
+    lock: () => invoke(IPC_CHANNELS.authLock),
+    changePassword: (input) => invoke(IPC_CHANNELS.authChangePassword, input),
+    securityQuestion: () => invoke(IPC_CHANNELS.authSecurityQuestion),
+    resetPassword: (input) => invoke(IPC_CHANNELS.authResetPassword, input)
+  },
+
   settings: {
     get: () => invoke(IPC_CHANNELS.settingsGet),
     update: (patch) => invoke(IPC_CHANNELS.settingsUpdate, patch)

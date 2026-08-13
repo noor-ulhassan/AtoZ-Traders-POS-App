@@ -3,12 +3,31 @@ import type { JSX } from 'react'
 import type { CategoryProfitRow, DateRange, NamedAmount } from '@shared/types'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
 import { Column, DataTable } from '../../components/ui/DataTable'
-import { StatTile } from '../../components/ui/StatTile'
+import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
-import styles from './ReportsPage.module.css'
+
+/**
+ * A proportion bar, used in both breakdown tables.
+ *
+ * The fill is a block: as an inline span it would ignore the width it is given
+ * and the bar would read as permanently empty.
+ */
+function ShareBar({ percent }: { percent: number }): JSX.Element {
+  return (
+    <span className="flex items-center gap-3">
+      <span className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+        <span
+          className="block h-full rounded-full bg-accent"
+          style={{ width: `${Math.min(100, percent)}%` }}
+        />
+      </span>
+      <span className="w-11 text-right text-ink-muted">{percent.toFixed(0)}%</span>
+    </span>
+  )
+}
 
 interface StatementLine {
   label: string
@@ -67,7 +86,7 @@ export function ProfitLossReportView({ range }: { range: DateRange }): JSX.Eleme
       numeric: true,
       width: '140px',
       render: (row) => (
-        <span className={row.profit < 0 ? styles.negative : styles.positive}>
+        <span className={row.profit < 0 ? 'text-bad' : 'text-good'}>
           {format.money(row.profit)}
         </span>
       )
@@ -78,16 +97,7 @@ export function ProfitLossReportView({ range }: { range: DateRange }): JSX.Eleme
       width: '180px',
       render: (row) => {
         const share = data.netSales === 0 ? 0 : (row.revenue / data.grossSales) * 100
-        return (
-          <span className={styles.barCell}>
-            <span className={styles.barTrack}>
-              <span className={styles.barFill} style={{ width: `${Math.min(100, share)}%` }} />
-            </span>
-            <span style={{ width: 44, textAlign: 'right', color: 'var(--ink-muted)' }}>
-              {share.toFixed(0)}%
-            </span>
-          </span>
-        )
+        return <ShareBar percent={share} />
       }
     }
   ]
@@ -107,23 +117,14 @@ export function ProfitLossReportView({ range }: { range: DateRange }): JSX.Eleme
       width: '160px',
       render: (row) => {
         const share = data.expenses === 0 ? 0 : (row.amount / data.expenses) * 100
-        return (
-          <span className={styles.barCell}>
-            <span className={styles.barTrack}>
-              <span className={styles.barFill} style={{ width: `${Math.min(100, share)}%` }} />
-            </span>
-            <span style={{ width: 44, textAlign: 'right', color: 'var(--ink-muted)' }}>
-              {share.toFixed(0)}%
-            </span>
-          </span>
-        )
+        return <ShareBar percent={share} />
       }
     }
   ]
 
   return (
     <>
-      <div className={styles.tiles}>
+      <StatGrid min={200}>
         <StatTile label="Net sales" unit={currency} value={format.money(data.netSales)} />
         <StatTile label="Gross profit" unit={currency} value={format.money(data.grossProfit)} />
         <StatTile label="Expenses" unit={currency} value={format.money(data.expenses)} tone="bad" />
@@ -135,30 +136,40 @@ export function ProfitLossReportView({ range }: { range: DateRange }): JSX.Eleme
           footnote={`${margin.toFixed(1)}% of net sales`}
         />
         <StatTile label="Bills" value={data.billCount} />
-      </div>
+      </StatGrid>
 
-      <div className={styles.split}>
+      <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] items-start gap-5">
         <Card>
           <CardHeader
             title="Profit and loss"
             subtitle={`${format.date(range.from)} to ${format.date(range.to)}`}
           />
-          <div className={styles.statement}>
+          <div className="flex flex-col">
             {lines.map((line, index) => (
               <div
                 key={index}
                 className={clsx(
-                  styles.line,
-                  line.indent && styles.indent,
-                  line.kind === 'result' && styles.result,
-                  line.kind === 'net' && styles.netProfit
+                  'flex items-baseline justify-between gap-4 border-t border-line px-5 py-2 text-sm first:border-t-0',
+                  line.kind === 'result' && 'border-line-strong bg-surface-sunken py-3',
+                  line.kind === 'net' && 'border-b border-accent-border bg-accent-weak'
                 )}
               >
-                <span className={styles.lineLabel}>{line.label}</span>
                 <span
                   className={clsx(
-                    styles.lineValue,
-                    line.kind === 'net' && line.value < 0 && styles.negative
+                    'text-ink-muted',
+                    line.indent && 'pl-4 text-caption text-ink-subtle',
+                    line.kind === 'result' && 'font-semibold text-ink',
+                    line.kind === 'net' && 'text-accent-ink'
+                  )}
+                >
+                  {line.label}
+                </span>
+                <span
+                  className={clsx(
+                    'font-medium tabular-nums',
+                    line.kind === 'result' && 'text-md font-semibold',
+                    line.kind === 'net' && 'font-display text-lg text-accent-ink',
+                    line.kind === 'net' && line.value < 0 && 'text-bad'
                   )}
                 >
                   {line.subtract && line.value > 0 ? '− ' : ''}
@@ -167,14 +178,14 @@ export function ProfitLossReportView({ range }: { range: DateRange }): JSX.Eleme
               </div>
             ))}
           </div>
-          <div className={styles.note}>
+          <div className="border-t border-line px-5 py-3 text-caption leading-normal text-ink-subtle">
             Bill-level discounts are deducted once from gross sales rather than spread across lines.
             Tax collected ({currency} {format.money(data.taxCollected)}) is held for the government
             and is not counted as revenue.
           </div>
         </Card>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+        <div className="flex flex-col gap-5">
           <Card>
             <CardHeader title="Where the profit came from" subtitle="By product category" />
             <CardBody flush>

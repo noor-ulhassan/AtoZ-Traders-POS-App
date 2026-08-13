@@ -41,6 +41,7 @@ export type IconName =
   | 'backup'
   | 'restore'
   | 'calendar'
+  | 'lock'
 
 const PATHS: Record<IconName, JSX.Element> = {
   dashboard: (
@@ -199,6 +200,13 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <rect x="3.5" y="5" width="17" height="16" rx="2" />
       <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4.5" y="10" width="15" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      <path d="M12 14v2.5" />
     </>
   )
 }

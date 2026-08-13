@@ -1,4 +1,9 @@
 import type {
+  AuthChangePasswordInput,
+  AuthLoginInput,
+  AuthResetInput,
+  AuthSetupInput,
+  AuthStatus,
   BackupResult,
   Category,
   Customer,
@@ -48,6 +53,7 @@ import type {
   SaleReturnWithItems,
   SaleWithItems,
   SalesSummaryReport,
+  SecurityQuestion,
   SellableUnit,
   Settings,
   SettingsUpdate,
@@ -67,6 +73,14 @@ import type {
  * the build if either side drifts.
  */
 export const IPC_CHANNELS = {
+  authStatus: 'auth:status',
+  authSetup: 'auth:setup',
+  authLogin: 'auth:login',
+  authLock: 'auth:lock',
+  authChangePassword: 'auth:changePassword',
+  authSecurityQuestion: 'auth:securityQuestion',
+  authResetPassword: 'auth:resetPassword',
+
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
 
@@ -151,6 +165,16 @@ export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
 type Result<T> = Promise<IpcResult<T>>
 
 export interface PosApi {
+  auth: {
+    status(): Result<AuthStatus>
+    setup(input: AuthSetupInput): Result<AuthStatus>
+    login(input: AuthLoginInput): Result<AuthStatus>
+    lock(): Result<AuthStatus>
+    changePassword(input: AuthChangePasswordInput): Result<AuthStatus>
+    securityQuestion(): Result<SecurityQuestion>
+    resetPassword(input: AuthResetInput): Result<AuthStatus>
+  }
+
   settings: {
     get(): Result<Settings>
     update(patch: SettingsUpdate): Result<Settings>

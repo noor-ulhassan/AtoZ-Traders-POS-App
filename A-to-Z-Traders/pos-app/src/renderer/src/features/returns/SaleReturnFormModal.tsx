@@ -274,8 +274,8 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
 
         <Field label="Customer" className="min-w-0 flex-1">
           {customer ? (
-            /* With a bill attached the customer comes from it, so it cannot
-                be cleared independently. */
+            // With a bill attached the customer comes from it, so it cannot be
+            // cleared independently.
             <ChosenValue
               clearLabel="Clear customer"
               onClear={sale ? undefined : () => setCustomer(null)}

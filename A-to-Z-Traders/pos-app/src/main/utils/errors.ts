@@ -37,6 +37,10 @@ export const businessRule = (message: string): AppError => new AppError('BUSINES
 export const invalid = (message: string, fields?: Record<string, string>): AppError =>
   new AppError('VALIDATION', message, fields)
 
+/** The session is locked; the caller must unlock before this channel runs. */
+export const authRequired = (message = 'Please unlock the app to continue.'): AppError =>
+  new AppError('AUTH', message)
+
 /** Turn a driver-level SQLite error into something the shop owner can act on. */
 export function translateSqliteError(error: unknown): AppError | null {
   if (!(error instanceof Error)) return null

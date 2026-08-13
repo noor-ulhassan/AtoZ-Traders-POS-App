@@ -166,11 +166,7 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps): JSX.
               ]}
             />
 
-            {data.notes && (
-              <p style={{ marginTop: 'var(--space-4)', fontSize: 13, color: 'var(--ink-muted)' }}>
-                {data.notes}
-              </p>
-            )}
+            {data.notes && <p className="mt-4 text-sm text-ink-muted">{data.notes}</p>}
           </>
         )}
       </Modal>

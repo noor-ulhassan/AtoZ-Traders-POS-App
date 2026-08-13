@@ -5,6 +5,7 @@ import type { Customer, Product, SellableUnit } from '@shared/types'
 import { today } from '@shared/date'
 import { money as round, sumMoney } from '@shared/money'
 import { Button } from '../../components/ui/Button'
+import { ChosenValue } from '../../components/ui/ChosenValue'
 import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Select, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
@@ -18,7 +19,6 @@ import { useProductSearch } from '../../hooks/useProductSearch'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
-import styles from './PurchaseEntryPage.module.css'
 
 interface Line {
   key: number
@@ -144,7 +144,7 @@ export function PurchaseEntryPage(): JSX.Element {
       width: '140px',
       render: (line) => (
         <Select
-          className={styles.unitSelect}
+          className="min-w-[110px]"
           value={line.unitName}
           onChange={(event) => changeUnit(line, event.target.value)}
         >
@@ -164,7 +164,6 @@ export function PurchaseEntryPage(): JSX.Element {
       width: '120px',
       render: (line) => (
         <NumberInput
-          className={styles.lineInput}
           value={line.qty}
           onValueChange={(value) => updateLine(line.key, { qty: value })}
         />
@@ -177,7 +176,6 @@ export function PurchaseEntryPage(): JSX.Element {
       width: '160px',
       render: (line) => (
         <NumberInput
-          className={styles.lineInput}
           value={line.unitCost}
           onValueChange={(value) => updateLine(line.key, { unitCost: value })}
         />
@@ -239,10 +237,10 @@ export function PurchaseEntryPage(): JSX.Element {
       />
 
       <PageBody>
-        <div className={styles.layout}>
+        <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-5">
           <Card>
-            <div className={styles.picker}>
-              <label className={styles.pickerLabel}>Add item</label>
+            <div className="border-b border-line p-4">
+              <label className="mb-1 block text-caption font-medium text-ink-muted">Add item</label>
               <Combobox
                 query={productQuery}
                 onQueryChange={setProductQuery}
@@ -267,24 +265,21 @@ export function PurchaseEntryPage(): JSX.Element {
             </CardBody>
           </Card>
 
-          <Card className={styles.totalsCard}>
+          <Card className="sticky top-[calc(var(--header-height)+24px)]">
             <CardHeader title="Purchase details" />
             <CardBody>
-              <div className={styles.fields}>
+              <div className="flex flex-col gap-4">
                 <Field label="Supplier" hint="Leave empty for a cash purchase with no account">
                   {supplier ? (
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                      <Input value={supplier.name} readOnly />
-                      <Button
-                        variant="ghost"
-                        icon="close"
-                        aria-label="Clear supplier"
-                        onClick={() => {
-                          setSupplier(null)
-                          setSupplierQuery('')
-                        }}
-                      />
-                    </div>
+                    <ChosenValue
+                      clearLabel="Clear supplier"
+                      onClear={() => {
+                        setSupplier(null)
+                        setSupplierQuery('')
+                      }}
+                    >
+                      {supplier.name}
+                    </ChosenValue>
                   ) : (
                     <Combobox
                       query={supplierQuery}
@@ -300,7 +295,7 @@ export function PurchaseEntryPage(): JSX.Element {
                   )}
                 </Field>
 
-                <div className={styles.twoUp}>
+                <div className="grid grid-cols-2 gap-3">
                   <Field label="Their invoice no.">
                     <Input
                       value={invoiceNo}
@@ -336,7 +331,7 @@ export function PurchaseEntryPage(): JSX.Element {
                   />
                 </Field>
 
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <div className="flex gap-2">
                   <Button size="sm" onClick={() => setPaidAmount(total)}>
                     Paid in full
                   </Button>
@@ -371,7 +366,7 @@ export function PurchaseEntryPage(): JSX.Element {
               />
 
               {owing > 0.005 && !supplier && (
-                <div style={{ marginTop: 'var(--space-4)' }}>
+                <div className="mt-4">
                   <Callout tone="warn" title="Choose a supplier">
                     An unpaid amount has to sit on someone&apos;s account. Pick a supplier, or mark
                     the purchase as paid in full.

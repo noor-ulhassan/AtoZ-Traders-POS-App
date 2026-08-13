@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { SummaryList } from '../../components/ui/SummaryList'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useHotkey } from '../../hooks/useHotkey'
@@ -20,7 +21,21 @@ import { useSettings } from '../../app/SettingsContext'
 import { BillLines } from './BillLines'
 import { ReceiptModal } from './ReceiptModal'
 import { useBill } from './useBill'
-import styles from './BillingPage.module.css'
+
+const PAYMENT_TYPES: { value: PaymentType; label: string }[] = [
+  { value: 'cash', label: 'Paid in full' },
+  { value: 'partial', label: 'Part paid' },
+  { value: 'credit', label: 'On khata' }
+]
+
+/** A keyboard key in the shortcut hints under the search box. */
+function Kbd({ children }: { children: string }): JSX.Element {
+  return (
+    <span className="rounded-sm border border-b-2 border-line-strong bg-surface-sunken px-[5px] py-px font-mono text-[11px] text-ink-muted">
+      {children}
+    </span>
+  )
+}
 
 /**
  * The billing screen.
@@ -148,30 +163,31 @@ export function BillingPage(): JSX.Element {
   const needsCustomer = due > 0.005 && !bill.customer
 
   return (
-    <div className={styles.workspace}>
+    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_380px] bg-canvas">
       {/* ------------------------------------------------------------ left */}
-      <section className={styles.left}>
-        <div className={styles.topBar}>
+      <section className="flex min-h-0 min-w-0 flex-col border-r border-line bg-paper">
+        <div className="flex shrink-0 items-center gap-4 border-b border-line px-5 py-3">
           <div>
-            <span className={styles.invoiceLabel}>Invoice</span>
-            <span className={styles.invoiceNo}>{invoiceNo.data ?? '—'}</span>
+            <span className="block text-micro font-semibold tracking-[0.07em] text-ink-subtle uppercase">
+              Invoice
+            </span>
+            <span className="font-mono text-base font-semibold tracking-[-0.01em]">
+              {invoiceNo.data ?? '—'}
+            </span>
           </div>
-          <div className={styles.topSpacer} />
-          <label className={styles.dateField}>
+          <div className="flex-1" />
+          <label className="flex items-center gap-2 text-caption text-ink-muted">
             Date
-            <Input
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              style={{ width: 150 }}
-            />
+            <div className="w-[150px] shrink-0">
+              <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            </div>
           </label>
           <Button icon="trash" onClick={() => void clearBill()} disabled={bill.lines.length === 0}>
             Clear
           </Button>
         </div>
 
-        <div className={styles.scanRow}>
+        <div className="shrink-0 border-b border-line px-5 py-4">
           <Combobox
             query={productQuery}
             onQueryChange={setProductQuery}
@@ -183,24 +199,24 @@ export function BillingPage(): JSX.Element {
             size="lg"
             autoFocus
           />
-          <div className={styles.scanHint}>
+          <div className="mt-2 flex gap-4 text-caption text-ink-subtle">
             <span>
-              <span className={styles.key}>Enter</span> add first match
+              <Kbd>Enter</Kbd> add first match
             </span>
             <span>
-              <span className={styles.key}>F4</span> amount received
+              <Kbd>F4</Kbd> amount received
             </span>
             <span>
-              <span className={styles.key}>Ctrl</span>
-              <span className={styles.key}>Enter</span> save bill
+              <Kbd>Ctrl</Kbd>
+              <Kbd>Enter</Kbd> save bill
             </span>
             <span>
-              <span className={styles.key}>F8</span> clear
+              <Kbd>F8</Kbd> clear
             </span>
           </div>
         </div>
 
-        <div className={styles.lines}>
+        <div className="min-h-0 flex-1 overflow-auto">
           <BillLines
             lines={bill.lines}
             currency={settings.currency}
@@ -214,18 +230,18 @@ export function BillingPage(): JSX.Element {
       </section>
 
       {/* ----------------------------------------------------------- right */}
-      <aside className={styles.panel}>
-        <div className={styles.panelScroll}>
-          <div className={styles.panelSection}>
+      <aside className="flex min-h-0 flex-col bg-paper">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="border-b border-line px-5 py-4">
             <Field
               label="Customer"
               hint={bill.customer ? undefined : 'Leave empty for a walk-in cash sale'}
             >
               {bill.customer ? (
-                <div className={styles.customerCard}>
+                <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface-sunken p-3">
                   <div>
-                    <div className={styles.customerName}>{bill.customer.name}</div>
-                    <div className={styles.customerMeta}>
+                    <div className="text-sm font-semibold">{bill.customer.name}</div>
+                    <div className="text-caption text-ink-muted">
                       {format.balanceLabel(bill.customer.currentBalance, 'customer').text}
                     </div>
                   </div>
@@ -249,8 +265,8 @@ export function BillingPage(): JSX.Element {
             </Field>
           </div>
 
-          <div className={styles.panelSection}>
-            <div className={styles.stack}>
+          <div className="border-b border-line px-5 py-4">
+            <div className="flex flex-col gap-3">
               <Field label="Bill discount">
                 <NumberInput
                   prefix={settings.currency}
@@ -279,25 +295,29 @@ export function BillingPage(): JSX.Element {
             </div>
           </div>
 
-          <div className={styles.grandTotal}>
-            <span className={styles.grandTotalLabel}>Total {settings.currency}</span>
-            <span className={styles.grandTotalValue}>{format.money(totals.total)}</span>
+          <div className="flex items-baseline justify-between gap-3 border-y border-accent-border bg-accent-weak px-5 py-4">
+            <span className="text-micro font-semibold tracking-[0.07em] text-accent-ink uppercase">
+              Total {settings.currency}
+            </span>
+            <span className="font-display text-2xl font-semibold tracking-[-0.02em] tabular-nums text-accent-ink">
+              {format.money(totals.total)}
+            </span>
           </div>
 
-          <div className={styles.panelSection}>
-            <div className={styles.paymentTabs} role="group" aria-label="Payment type">
-              {(['cash', 'partial', 'credit'] as PaymentType[]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`${styles.paymentTab} ${paymentType === type ? styles.paymentTabActive : ''}`}
-                  disabled={type !== 'cash' && !bill.customer}
-                  title={type !== 'cash' && !bill.customer ? 'Choose a customer first' : undefined}
-                  onClick={() => choosePaymentType(type)}
-                >
-                  {type === 'cash' ? 'Paid in full' : type === 'partial' ? 'Part paid' : 'On khata'}
-                </button>
-              ))}
+          <div className="border-b border-line px-5 py-4">
+            <div className="mb-4">
+              <SegmentedControl
+                label="Payment type"
+                fullWidth
+                value={paymentType}
+                onChange={choosePaymentType}
+                options={PAYMENT_TYPES.map((type) => ({
+                  ...type,
+                  disabled: type.value !== 'cash' && !bill.customer,
+                  title:
+                    type.value !== 'cash' && !bill.customer ? 'Choose a customer first' : undefined
+                }))}
+              />
             </div>
 
             {paymentType !== 'credit' && (
@@ -311,7 +331,7 @@ export function BillingPage(): JSX.Element {
                   onValueChange={setPaidAmount}
                 />
                 {paymentType === 'partial' && (
-                  <div className={styles.quickAmounts}>
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {[0.25, 0.5, 0.75].map((fraction) => (
                       <Button
                         key={fraction}
@@ -326,7 +346,7 @@ export function BillingPage(): JSX.Element {
               </Field>
             )}
 
-            <div style={{ marginTop: 'var(--space-3)' }}>
+            <div className="mt-3">
               <SummaryList
                 rows={[
                   {
@@ -340,7 +360,7 @@ export function BillingPage(): JSX.Element {
             </div>
           </div>
 
-          <div className={styles.panelSection}>
+          <div className="border-b border-line px-5 py-4">
             <Field label="Notes">
               <Textarea
                 rows={2}
@@ -352,7 +372,7 @@ export function BillingPage(): JSX.Element {
           </div>
 
           {bill.shortages.length > 0 && (
-            <div className={styles.panelSection}>
+            <div className="border-b border-line px-5 py-4">
               <Callout tone="bad" title="Not enough stock">
                 {bill.shortages
                   .map(
@@ -366,7 +386,7 @@ export function BillingPage(): JSX.Element {
           )}
 
           {needsCustomer && (
-            <div className={styles.panelSection}>
+            <div className="border-b border-line px-5 py-4">
               <Callout tone="warn" title="Choose a customer">
                 An unpaid amount has to go on someone&apos;s khata.
               </Callout>
@@ -374,7 +394,7 @@ export function BillingPage(): JSX.Element {
           )}
         </div>
 
-        <div className={styles.actions}>
+        <div className="flex shrink-0 flex-col gap-2 border-t border-line px-5 py-4">
           <Button
             variant="primary"
             size="lg"

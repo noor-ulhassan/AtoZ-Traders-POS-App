@@ -136,7 +136,7 @@ export function CategoriesModal({
       size="md"
       footer={<Button onClick={onClose}>Done</Button>}
     >
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+      <div className="mb-4 flex gap-2">
         <Input
           value={newName}
           placeholder="New category name"

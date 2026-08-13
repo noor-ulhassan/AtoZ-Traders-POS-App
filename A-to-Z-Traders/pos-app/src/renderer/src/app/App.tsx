@@ -2,6 +2,8 @@ import type { JSX } from 'react'
 import { HashRouter } from 'react-router-dom'
 import { ConfirmProvider } from '../components/ui/Confirm'
 import { ToastProvider } from '../components/ui/Toast'
+import { AuthGate } from '../features/auth/AuthGate'
+import { AuthProvider } from './AuthContext'
 import { SettingsProvider } from './SettingsContext'
 import { AppRoutes } from './routes'
 
@@ -15,9 +17,13 @@ export function App(): JSX.Element {
     <HashRouter>
       <ToastProvider>
         <ConfirmProvider>
-          <SettingsProvider>
-            <AppRoutes />
-          </SettingsProvider>
+          <AuthProvider>
+            <AuthGate>
+              <SettingsProvider>
+                <AppRoutes />
+              </SettingsProvider>
+            </AuthGate>
+          </AuthProvider>
         </ConfirmProvider>
       </ToastProvider>
     </HashRouter>
