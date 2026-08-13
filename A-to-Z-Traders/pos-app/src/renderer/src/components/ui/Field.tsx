@@ -10,7 +10,7 @@ import { Icon } from '../icons/Icon'
  * that is the one thing a copied class string would eventually get wrong.
  */
 export const CONTROL =
-  'h-[34px] w-full rounded-md border border-line-strong bg-paper px-3 text-sm text-ink ' +
+  'h-[38px] w-full rounded-md border border-line-strong bg-paper px-3 text-sm text-ink ' +
   'transition-[border-color,box-shadow] duration-[120ms] placeholder:text-ink-subtle ' +
   'hover:not-disabled:not-focus:border-ink-subtle ' +
   'focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-weak)] focus:outline-none ' +
@@ -18,7 +18,7 @@ export const CONTROL =
   'aria-[invalid=true]:border-bad aria-[invalid=true]:focus:shadow-[0_0_0_3px_var(--bad-weak)]'
 
 /** The taller variant, for the one or two fields a screen is really about. */
-const CONTROL_LARGE = 'h-[42px] text-md font-medium'
+const CONTROL_LARGE = 'h-[46px] text-md font-medium'
 
 /* -------------------------------------------------------------- Field shell */
 
@@ -163,7 +163,9 @@ export function NumberInput({
           return
         }
         const parsed = Number(raw)
-        if (!Number.isNaN(parsed)) onValueChange(parsed)
+        // Finite only: rejects NaN and the Infinity from a pasted "1e999", so a
+        // stray value can never poison a running total.
+        if (Number.isFinite(parsed)) onValueChange(parsed)
       }}
       onFocus={(event) => {
         // Typing over a pre-filled rate is the common case, so select it all.

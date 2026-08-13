@@ -186,6 +186,8 @@ export function PaymentsPage(): JSX.Element {
               rows={rows}
               rowKey={(row) => row.id}
               isLoading={payments.isLoading}
+              error={payments.error}
+              onRetry={payments.refetch}
               empty={{
                 title: 'No payments in this period',
                 description:

@@ -155,6 +155,10 @@ const api = {
 
   printing: {
     receipt: (id) => invoke(IPC_CHANNELS.printReceipt, { id })
+  },
+
+  system: {
+    logError: (input) => invoke(IPC_CHANNELS.systemLogError, input)
   }
 } satisfies PosApi
 

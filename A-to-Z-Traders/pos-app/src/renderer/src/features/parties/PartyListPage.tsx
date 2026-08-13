@@ -201,6 +201,8 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
               rows={rows}
               rowKey={(party) => party.id}
               isLoading={parties.isLoading}
+              error={parties.error}
+              onRetry={parties.refetch}
               onRowClick={(party) => navigate(`/${partyType}s/${party.id}`)}
               empty={{
                 title: search ? 'No matches' : copy.emptyTitle,

@@ -257,6 +257,8 @@ export function ProductsPage(): JSX.Element {
               rows={rows}
               rowKey={(product) => product.id}
               isLoading={products.isLoading}
+              error={products.error}
+              onRetry={products.refetch}
               empty={{
                 title: search || lowStockOnly ? 'No products match' : 'No products yet',
                 description:

@@ -12,7 +12,8 @@ type Size = 'sm' | 'md' | 'lg'
  * that lights up under the cursor but refuses the click is a small lie.
  */
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-white border-accent enabled:hover:bg-accent-strong enabled:hover:border-accent-strong',
+  primary:
+    'bg-accent text-white border-accent enabled:hover:bg-accent-strong enabled:hover:border-accent-strong',
   secondary:
     'bg-paper text-ink border-line-strong enabled:hover:bg-surface-hover enabled:hover:border-ink-subtle',
   ghost: 'bg-transparent text-ink-muted enabled:hover:bg-surface-active enabled:hover:text-ink',
@@ -21,16 +22,16 @@ const VARIANTS: Record<Variant, string> = {
 }
 
 const SIZES: Record<Size, string> = {
-  sm: 'h-7 px-3 text-caption',
-  md: 'h-[34px] px-4 text-sm',
-  lg: 'h-[42px] px-6 text-base'
+  sm: 'h-8 px-3 text-caption',
+  md: 'h-[38px] px-4 text-sm',
+  lg: 'h-[46px] px-6 text-base'
 }
 
 /** Square when there is an icon and no label — width matches the height. */
 const ICON_ONLY_SIZES: Record<Size, string> = {
-  sm: 'w-7 px-0',
-  md: 'w-[34px] px-0',
-  lg: 'w-[42px] px-0'
+  sm: 'w-8 px-0',
+  md: 'w-[38px] px-0',
+  lg: 'w-[46px] px-0'
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

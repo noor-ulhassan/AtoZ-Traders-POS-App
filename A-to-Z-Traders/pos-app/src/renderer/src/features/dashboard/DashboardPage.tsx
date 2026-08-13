@@ -185,6 +185,8 @@ export function DashboardPage(): JSX.Element {
                   rowKey={(row) => row.id}
                   compact
                   isLoading={summary.isLoading}
+                  error={summary.error}
+                  onRetry={summary.refetch}
                   onRowClick={() => navigate('/sales')}
                   empty={{
                     title: 'No bills yet',
@@ -213,6 +215,9 @@ export function DashboardPage(): JSX.Element {
                   rows={data?.lowStock ?? []}
                   rowKey={(row) => row.productId}
                   compact
+                  isLoading={summary.isLoading}
+                  error={summary.error}
+                  onRetry={summary.refetch}
                   onRowClick={() => navigate('/products')}
                   empty={{
                     title: 'Stock levels are fine',

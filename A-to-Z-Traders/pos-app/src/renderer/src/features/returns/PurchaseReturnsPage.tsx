@@ -83,6 +83,8 @@ export function PurchaseReturnsPage(): JSX.Element {
               rows={rows}
               rowKey={(row) => row.id}
               isLoading={returns.isLoading}
+              error={returns.error}
+              onRetry={returns.refetch}
               empty={{
                 title: 'No purchase returns in this period',
                 description:

@@ -136,6 +136,8 @@ export function StockLedgerPage(): JSX.Element {
               rows={movements.data?.rows ?? []}
               rowKey={(row) => row.id}
               isLoading={movements.isLoading}
+              error={movements.error}
+              onRetry={movements.refetch}
               empty={{
                 title: 'No stock movements in this period',
                 description: 'Purchases, sales, returns and adjustments all appear here.'

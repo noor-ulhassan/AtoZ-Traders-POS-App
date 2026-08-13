@@ -155,6 +155,8 @@ export function PurchasesPage(): JSX.Element {
               rows={rows}
               rowKey={(row) => row.id}
               isLoading={purchases.isLoading}
+              error={purchases.error}
+              onRetry={purchases.refetch}
               onRowClick={(row) => setOpenId(row.id)}
               empty={{
                 title: 'No purchases in this period',

@@ -67,6 +67,11 @@ export function PartyFormModal({
   // from, so it stops being editable once there is history behind it.
   const openingIsLocked = isEditing && party.currentBalance !== party.openingBalance
 
+  const canSave = Boolean(name.trim()) && !save.isPending
+  const submit = (): void => {
+    if (canSave) void save.run()
+  }
+
   return (
     <Modal
       open
@@ -76,70 +81,76 @@ export function PartyFormModal({
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant="primary"
-            loading={save.isPending}
-            disabled={!name.trim()}
-            onClick={() => void save.run()}
-          >
+          <Button variant="primary" loading={save.isPending} disabled={!canSave} onClick={submit}>
             {isEditing ? 'Save changes' : `Add ${copy.noun}`}
           </Button>
         </>
       }
     >
-      <FormGrid>
-        <GridCell span={8}>
-          <Field label="Name" required error={save.errors['input.name']}>
-            <Input
-              value={name}
-              autoFocus
-              onChange={(event) => setName(event.target.value)}
-              invalid={Boolean(save.errors['input.name'])}
-            />
-          </Field>
-        </GridCell>
-
-        <GridCell span={4}>
-          <Field label="Phone">
-            <Input value={phone} onChange={(event) => setPhone(event.target.value)} />
-          </Field>
-        </GridCell>
-
-        <GridCell span={12}>
-          <Field label="Address">
-            <Textarea
-              rows={2}
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-            />
-          </Field>
-        </GridCell>
-
-        <GridCell span={6}>
-          <Field
-            label={copy.openingLabel}
-            hint={
-              openingIsLocked ? 'Locked — there are transactions on this account' : copy.openingHint
-            }
-          >
-            <NumberInput
-              prefix={currency}
-              value={openingBalance}
-              onValueChange={setOpeningBalance}
-              disabled={openingIsLocked}
-            />
-          </Field>
-        </GridCell>
-
-        {openingIsLocked && (
-          <GridCell span={12}>
-            <Callout tone="info">
-              To correct the balance now, record a payment or a return instead — that keeps the
-              statement adding up.
-            </Callout>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+      >
+        <FormGrid>
+          <GridCell span={8}>
+            <Field label="Name" required error={save.errors['input.name']}>
+              <Input
+                value={name}
+                autoFocus
+                onChange={(event) => setName(event.target.value)}
+                invalid={Boolean(save.errors['input.name'])}
+              />
+            </Field>
           </GridCell>
-        )}
-      </FormGrid>
+
+          <GridCell span={4}>
+            <Field label="Phone">
+              <Input value={phone} onChange={(event) => setPhone(event.target.value)} />
+            </Field>
+          </GridCell>
+
+          <GridCell span={12}>
+            <Field label="Address">
+              <Textarea
+                rows={2}
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+              />
+            </Field>
+          </GridCell>
+
+          <GridCell span={6}>
+            <Field
+              label={copy.openingLabel}
+              hint={
+                openingIsLocked
+                  ? 'Locked — there are transactions on this account'
+                  : copy.openingHint
+              }
+            >
+              <NumberInput
+                prefix={currency}
+                value={openingBalance}
+                onValueChange={setOpeningBalance}
+                disabled={openingIsLocked}
+              />
+            </Field>
+          </GridCell>
+
+          {openingIsLocked && (
+            <GridCell span={12}>
+              <Callout tone="info">
+                To correct the balance now, record a payment or a return instead — that keeps the
+                statement adding up.
+              </Callout>
+            </GridCell>
+          )}
+        </FormGrid>
+        {/* Lets Enter submit from any field; the visible action is in the footer. */}
+        <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
+      </form>
     </Modal>
   )
 }

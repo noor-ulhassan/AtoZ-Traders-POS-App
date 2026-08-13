@@ -1,9 +1,9 @@
 import clsx from 'clsx'
 import type { HTMLAttributes, JSX, ReactNode } from 'react'
 
-/* Cards are flat: a hairline border and a white ground. Shadows are reserved
-   for things that genuinely float (modals, popovers), so elevation keeps
-   meaning something. */
+/* Cards rest on a whisper of shadow (`shadow-card`) over their hairline border,
+   so the workspace reads as layered paper. Popovers and modals sit clearly
+   higher, so elevation still ranks things. */
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode
@@ -12,7 +12,10 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 export function Card({ className, children, ...props }: CardProps): JSX.Element {
   return (
     <div
-      className={clsx('overflow-hidden rounded-lg border border-line bg-paper', className)}
+      className={clsx(
+        'overflow-hidden rounded-lg border border-line bg-surface-raised shadow-card',
+        className
+      )}
       {...props}
     >
       {children}

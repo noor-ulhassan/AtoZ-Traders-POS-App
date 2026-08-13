@@ -64,11 +64,36 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-// A crash mid-transaction must not leave the WAL unflushed.
-process.on('uncaughtException', (error) => {
-  log.error('uncaught exception', error)
-})
+/**
+ * Last-resort handler for an error no service caught. Better-sqlite3 is
+ * synchronous and each write is its own committed transaction, so the database
+ * on disk is already consistent — but we still flush the WAL, tell the owner
+ * plainly, and exit rather than limp along in an unknown state.
+ */
+let crashing = false
+function handleFatal(label: string, error: unknown): void {
+  log.error(label, error)
+  if (crashing) return
+  crashing = true
 
-process.on('unhandledRejection', (reason) => {
-  log.error('unhandled rejection', reason)
-})
+  try {
+    closeDatabase()
+  } catch (closeError) {
+    log.error('failed to close database during crash', closeError)
+  }
+
+  try {
+    dialog.showErrorBox(
+      'The app has to close',
+      'An unexpected error occurred. Your data is safe — every completed sale and payment was already saved. Please start the app again.\n\n' +
+        `Details: ${error instanceof Error ? error.message : String(error)}`
+    )
+  } catch {
+    // A dialog failure must not stop the exit below.
+  }
+
+  app.exit(1)
+}
+
+process.on('uncaughtException', (error) => handleFatal('uncaught exception', error))
+process.on('unhandledRejection', (reason) => handleFatal('unhandled rejection', reason))

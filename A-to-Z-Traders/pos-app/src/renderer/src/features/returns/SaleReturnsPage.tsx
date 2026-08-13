@@ -98,6 +98,8 @@ export function SaleReturnsPage(): JSX.Element {
               rows={rows}
               rowKey={(row) => row.id}
               isLoading={returns.isLoading}
+              error={returns.error}
+              onRetry={returns.refetch}
               empty={{
                 title: 'No returns in this period',
                 description: 'Returned goods go back into stock and adjust profit automatically.'

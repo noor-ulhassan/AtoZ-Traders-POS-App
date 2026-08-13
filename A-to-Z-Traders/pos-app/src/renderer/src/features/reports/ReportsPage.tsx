@@ -199,6 +199,8 @@ function ProductProfitView({
           rows={rows.data ?? []}
           rowKey={(row) => row.productId}
           isLoading={rows.isLoading}
+          error={rows.error}
+          onRetry={rows.refetch}
           empty={{ title: 'No sales in this period' }}
         />
       </CardBody>
@@ -287,6 +289,8 @@ function StockValuationView({ currency }: { currency: string }): JSX.Element {
             rows={data?.rows ?? []}
             rowKey={(row) => row.productId}
             isLoading={report.isLoading}
+            error={report.error}
+            onRetry={report.refetch}
             empty={{ title: 'No active products' }}
           />
         </CardBody>
@@ -350,6 +354,8 @@ function ReorderView(): JSX.Element {
           rows={rows.data ?? []}
           rowKey={(row) => row.productId}
           isLoading={rows.isLoading}
+          error={rows.error}
+          onRetry={rows.refetch}
           empty={{
             title: 'Nothing needs reordering',
             description: 'Every product with a reorder level is above it.'

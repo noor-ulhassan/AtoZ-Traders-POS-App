@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import type { JSX } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useHotkey } from '../../hooks/useHotkey'
+import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { NAVIGATION } from './navigation'
 import { Sidebar } from './Sidebar'
 
@@ -37,7 +38,11 @@ export function AppShell(): JSX.Element {
             flush ? 'overflow-hidden' : 'overflow-y-auto'
           )}
         >
-          <Outlet />
+          {/* A per-screen boundary so one broken page keeps the sidebar usable;
+              keyed to the route so navigating away clears a crashed screen. */}
+          <ErrorBoundary context={location.pathname} resetKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

@@ -66,7 +66,9 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
       key: 'reference',
       header: 'Reference',
       width: '140px',
-      render: (row) => <span className="font-mono text-caption text-ink-muted">{row.reference}</span>
+      render: (row) => (
+        <span className="font-mono text-caption text-ink-muted">{row.reference}</span>
+      )
     },
     {
       key: 'debit',
@@ -168,6 +170,8 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
               rows={data?.entries ?? []}
               rowKey={(row, index) => `${row.sourceTable}-${row.sourceId}-${index}`}
               isLoading={statement.isLoading}
+              error={statement.error}
+              onRetry={statement.refetch}
               empty={{
                 title: 'Nothing in this period',
                 description: 'Credit bills, payments and returns all appear on this statement.'

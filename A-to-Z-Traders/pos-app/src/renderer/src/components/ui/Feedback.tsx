@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import type { JSX, ReactNode } from 'react'
 import { Icon } from '../icons/Icon'
+import { Button } from './Button'
 
 export type Tone = 'neutral' | 'good' | 'bad' | 'warn' | 'accent'
 
@@ -93,6 +94,42 @@ export function EmptyState({ title, description, action }: EmptyStateProps): JSX
       <span className="text-base font-semibold text-ink">{title}</span>
       {description && <span className="max-w-[44ch] text-sm">{description}</span>}
       {action && <div className="mt-3">{action}</div>}
+    </div>
+  )
+}
+
+/* ---- ErrorState: a read that failed, with a way to try again */
+
+interface ErrorStateProps {
+  title?: string
+  message?: string
+  onRetry?: () => void
+}
+
+/**
+ * Shown when a data read fails, in place of the empty state — so a locked or
+ * unreadable database says so and offers a retry, instead of silently pretending
+ * there are simply no records.
+ */
+export function ErrorState({
+  title = "Couldn't load this",
+  message,
+  onRetry
+}: ErrorStateProps): JSX.Element {
+  return (
+    <div className="flex flex-col items-center gap-2 text-center" role="alert">
+      <div className="mb-1 flex size-10 items-center justify-center rounded-full bg-bad-weak text-bad">
+        <Icon name="warning" size={20} />
+      </div>
+      <span className="text-base font-semibold text-ink">{title}</span>
+      {message && <span className="max-w-[44ch] text-sm text-ink-muted">{message}</span>}
+      {onRetry && (
+        <div className="mt-3">
+          <Button icon="restore" onClick={onRetry}>
+            Try again
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

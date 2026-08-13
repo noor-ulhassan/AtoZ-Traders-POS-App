@@ -101,7 +101,8 @@
   --text-2xl: var(--fs-2xl);
   --text-2xl--line-height: 1.15;
 
-  /* ---- elevation: reserved for things that float above the page */
+  /* ---- elevation */
+  --shadow-card: var(--elevation-card);
   --shadow-popover: var(--elevation-popover);
   --shadow-modal: var(--elevation-modal);
 }

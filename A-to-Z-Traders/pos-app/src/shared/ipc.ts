@@ -156,7 +156,9 @@ export const IPC_CHANNELS = {
   backupRestore: 'backup:restore',
   backupInfo: 'backup:info',
 
-  printReceipt: 'printing:receipt'
+  printReceipt: 'printing:receipt',
+
+  systemLogError: 'system:logError'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
@@ -290,5 +292,12 @@ export interface PosApi {
 
   printing: {
     receipt(saleId: Id): Result<{ printed: boolean }>
+  }
+
+  system: {
+    /** Persists a renderer-side crash to the main log for support. */
+    logError(input: { message: string; stack?: string; context?: string }): Result<{
+      logged: boolean
+    }>
   }
 }

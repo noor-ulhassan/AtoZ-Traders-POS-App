@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import type { JSX } from 'react'
 import type { CategoryProfitRow, DateRange, NamedAmount } from '@shared/types'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
+import { ErrorState } from '../../components/ui/Feedback'
 import { Column, DataTable } from '../../components/ui/DataTable'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { useQuery } from '../../hooks/useQuery'
@@ -46,7 +47,13 @@ export function ProfitLossReportView({ range }: { range: DateRange }): JSX.Eleme
   if (!data) {
     return (
       <Card>
-        <CardBody>Loading…</CardBody>
+        <CardBody className="py-12">
+          {report.error ? (
+            <ErrorState message={report.error} onRetry={report.refetch} />
+          ) : (
+            <div className="text-center text-ink-subtle">Loading…</div>
+          )}
+        </CardBody>
       </Card>
     )
   }

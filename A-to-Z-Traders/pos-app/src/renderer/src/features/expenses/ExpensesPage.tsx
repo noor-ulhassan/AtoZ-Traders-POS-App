@@ -191,6 +191,8 @@ export function ExpensesPage(): JSX.Element {
               rows={rows}
               rowKey={(row) => row.id}
               isLoading={expenses.isLoading}
+              error={expenses.error}
+              onRetry={expenses.refetch}
               empty={{
                 title: 'No expenses in this period',
                 description: 'Recording expenses is what turns gross profit into real profit.',

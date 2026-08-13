@@ -1,6 +1,7 @@
 import type { JSX } from 'react'
 import { HashRouter } from 'react-router-dom'
 import { ConfirmProvider } from '../components/ui/Confirm'
+import { ErrorBoundary } from '../components/ui/ErrorBoundary'
 import { ToastProvider } from '../components/ui/Toast'
 import { AuthGate } from '../features/auth/AuthGate'
 import { AuthProvider } from './AuthContext'
@@ -15,17 +16,19 @@ import { AppRoutes } from './routes'
 export function App(): JSX.Element {
   return (
     <HashRouter>
-      <ToastProvider>
-        <ConfirmProvider>
-          <AuthProvider>
-            <AuthGate>
-              <SettingsProvider>
-                <AppRoutes />
-              </SettingsProvider>
-            </AuthGate>
-          </AuthProvider>
-        </ConfirmProvider>
-      </ToastProvider>
+      <ErrorBoundary context="app">
+        <ToastProvider>
+          <ConfirmProvider>
+            <AuthProvider>
+              <AuthGate>
+                <SettingsProvider>
+                  <AppRoutes />
+                </SettingsProvider>
+              </AuthGate>
+            </AuthProvider>
+          </ConfirmProvider>
+        </ToastProvider>
+      </ErrorBoundary>
     </HashRouter>
   )
 }

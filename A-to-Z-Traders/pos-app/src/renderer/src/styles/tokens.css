@@ -21,16 +21,17 @@
    ========================================================================== */
 
 :root {
-  /* ---- neutrals: grey with a slight blue bias, to sit under the accent */
+  /* ---- neutrals: a warm off-white paper and soft warm-grey lines, so the
+     workspace feels less clinical than a pure-white, cool-grey sheet. */
   --paper: #ffffff;
-  --canvas: #f4f5f7;
-  --surface-sunken: #eef0f3;
+  --canvas: #f5f4f2;
+  --surface-sunken: #f0efec;
   --surface-raised: #ffffff;
-  --surface-hover: #f3f5f7;
-  --surface-active: #e9edf1;
+  --surface-hover: #f6f5f2;
+  --surface-active: #ece9e4;
 
-  --line: #e0e3e8;
-  --line-strong: #cbd1d9;
+  --line: #e7e4df;
+  --line-strong: #d5d1ca;
 
   --ink: #14181d;
   --ink-muted: #5b6572;
@@ -73,7 +74,10 @@
   --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
   --focus-ring-tight: 0 0 0 2px var(--accent);
 
-  /* ---- elevation: reserved for things that float above the page */
+  /* ---- elevation */
+  /* A whisper of depth on resting cards, so the workspace reads as layered
+     paper rather than a flat wireframe. Popover/modal stay clearly higher. */
+  --elevation-card: 0 1px 2px rgb(56 48 38 / 4%), 0 2px 5px rgb(56 48 38 / 5%);
   --elevation-popover: 0 4px 12px rgb(16 24 32 / 10%), 0 1px 3px rgb(16 24 32 / 8%);
   --elevation-modal: 0 16px 48px rgb(16 24 32 / 18%), 0 2px 8px rgb(16 24 32 / 10%);
 
@@ -84,22 +88,24 @@
     'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --family-mono: 'Cascadia Mono', 'Consolas', ui-monospace, 'Courier New', monospace;
 
-  --fs-micro: 11px;
-  --fs-caption: 12px;
-  --fs-sm: 13px;
-  --fs-base: 14px;
-  --fs-md: 16px;
-  --fs-lg: 20px;
-  --fs-xl: 28px;
-  --fs-2xl: 34px;
+  /* Type scale, nudged up one step from the original for all-day counter
+     legibility: 15px body reads comfortably at arm's length on a shop screen. */
+  --fs-micro: 11.5px;
+  --fs-caption: 12.5px;
+  --fs-sm: 13.5px;
+  --fs-base: 15px;
+  --fs-md: 17px;
+  --fs-lg: 21px;
+  --fs-xl: 29px;
+  --fs-2xl: 35px;
 
   --lh-tight: 1.25;
   --lh-normal: 1.5;
 
-  /* ---- layout */
-  --sidebar-width: 232px;
-  --header-height: 60px;
-  --row-height: 38px;
+  /* ---- layout: roomier controls and rows to match the larger type */
+  --sidebar-width: 240px;
+  --header-height: 64px;
+  --row-height: 42px;
 
   color-scheme: light;
 }
@@ -155,6 +161,7 @@
 
     --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
 
+    --elevation-card: 0 1px 2px rgb(0 0 0 / 28%), 0 2px 5px rgb(0 0 0 / 22%);
     --elevation-popover: 0 4px 12px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
     --elevation-modal: 0 16px 48px rgb(0 0 0 / 55%), 0 2px 8px rgb(0 0 0 / 40%);
 

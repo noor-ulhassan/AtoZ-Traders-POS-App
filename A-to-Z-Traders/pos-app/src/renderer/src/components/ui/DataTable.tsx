@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import type { JSX, ReactNode } from 'react'
-import { EmptyState } from './Feedback'
+import { EmptyState, ErrorState } from './Feedback'
 
 /**
  * Cell styling lives on the cells rather than on descendant selectors from the
@@ -31,6 +31,9 @@ interface DataTableProps<Row> {
   rows: Row[]
   rowKey: (row: Row, index: number) => string | number
   isLoading?: boolean
+  /** A read failure: shown in place of the rows, with a retry. */
+  error?: string | null
+  onRetry?: () => void
   onRowClick?: (row: Row) => void
   isRowSelected?: (row: Row) => boolean
   /** Rendered in place of the table body when there are no rows. */
@@ -52,6 +55,8 @@ export function DataTable<Row>({
   rows,
   rowKey,
   isLoading = false,
+  error,
+  onRetry,
   onRowClick,
   isRowSelected,
   empty,
@@ -59,6 +64,16 @@ export function DataTable<Row>({
   compact = false,
   className
 }: DataTableProps<Row>): JSX.Element {
+  // A failed read wins over the empty state: "no rows" and "could not read the
+  // rows" are different facts and must not look the same.
+  if (error && rows.length === 0) {
+    return (
+      <div className="px-6 py-12">
+        <ErrorState message={error} onRetry={onRetry} />
+      </div>
+    )
+  }
+
   if (!isLoading && rows.length === 0 && empty) {
     return (
       <div className="px-6 py-12">
@@ -83,7 +98,7 @@ export function DataTable<Row>({
               <th
                 key={column.key}
                 style={column.width ? { width: column.width } : undefined}
-                className={clsx(HEAD_CELL, density, !compact && 'h-[34px]', align(column))}
+                className={clsx(HEAD_CELL, density, !compact && 'h-[38px]', align(column))}
               >
                 {column.header}
               </th>

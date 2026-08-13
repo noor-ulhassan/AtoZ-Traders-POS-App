@@ -197,6 +197,8 @@ export function SalesPage(): JSX.Element {
               rows={rows}
               rowKey={(sale) => sale.id}
               isLoading={sales.isLoading}
+              error={sales.error}
+              onRetry={sales.refetch}
               onRowClick={(sale) => setOpenId(sale.id)}
               empty={{
                 title: 'No bills in this period',
