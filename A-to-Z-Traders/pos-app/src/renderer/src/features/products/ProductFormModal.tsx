@@ -45,8 +45,22 @@ const EMPTY: FormState = {
   units: []
 }
 
-/** Common base units in a wholesale shop, offered as a starting point. */
-const BASE_UNITS = ['piece', 'kg', 'gram', 'litre', 'metre', 'packet', 'bag']
+/** Common base units in a wholesale shop, offered as a starting point. Weight
+ *  and volume units are first-class: a product can be counted (and sold loose)
+ *  in kg, grams, litres or millilitres, at fractional quantities. */
+const BASE_UNITS = [
+  'piece',
+  'kg',
+  'gram',
+  'litre',
+  'ml',
+  'metre',
+  'foot',
+  'dozen',
+  'pair',
+  'packet',
+  'bag'
+]
 
 function toFormState(product: ProductWithUnits | null): FormState {
   if (!product) return EMPTY
@@ -117,6 +131,11 @@ export function ProductFormModal({
   // Once a product has been purchased, its cost belongs to the weighted
   // average and a form must not overwrite it.
   const costIsLocked = isEditing && product.stockQty !== 0
+
+  // Opening stock carries a cost: without one, every sale of that stock reports
+  // pure profit (COGS of zero). We warn rather than block, because stock that
+  // really was free is a valid case and 100% profit is then the honest number.
+  const openingStockHasNoCost = !isEditing && form.openingStock > 0 && form.costPrice <= 0
 
   return (
     <Modal
@@ -189,7 +208,7 @@ export function ProductFormModal({
               list="base-units"
               value={form.baseUnit}
               onChange={(event) => set('baseUnit', event.target.value)}
-              disabled={isEditing && product.stockQty !== 0}
+              disabled={isEditing && product.hasStockHistory}
             />
             <datalist id="base-units">
               {BASE_UNITS.map((unit) => (
@@ -205,7 +224,9 @@ export function ProductFormModal({
             hint={
               costIsLocked
                 ? 'Set by purchases (weighted average)'
-                : 'Updated automatically as you buy stock'
+                : isEditing
+                  ? 'Updated automatically as you buy stock'
+                  : 'The cost of your opening stock. Purchases update it automatically after that.'
             }
           >
             <NumberInput
@@ -252,6 +273,15 @@ export function ProductFormModal({
           </GridCell>
         )}
 
+        {openingStockHasNoCost && (
+          <GridCell span={12}>
+            <Callout tone="warn" title="Opening stock has no cost">
+              Every sale of this opening stock will show as pure profit. Set the cost price above if
+              these goods were not free.
+            </Callout>
+          </GridCell>
+        )}
+
         <GridCell span={12}>
           <SectionLabel>Selling units</SectionLabel>
         </GridCell>
@@ -265,11 +295,14 @@ export function ProductFormModal({
           />
         </GridCell>
 
-        {isEditing && product.stockQty !== 0 && (
+        {isEditing && product.hasStockHistory && (
           <GridCell span={12}>
             <Callout tone="info">
-              This product has {product.stockQty} {product.baseUnit} in stock, so its base unit and
-              average cost are locked. Use a stock adjustment to correct the quantity.
+              The base unit of &ldquo;{product.name}&rdquo; is fixed because it already has stock
+              history — changing it would reinterpret every past quantity.
+              {product.stockQty !== 0 &&
+                ` Its cost is the weighted average of what you paid and updates only through purchases.`}{' '}
+              Use a stock adjustment to correct quantities.
             </Callout>
           </GridCell>
         )}

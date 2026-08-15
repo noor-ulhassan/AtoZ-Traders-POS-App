@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import type { JSX, KeyboardEvent, RefObject } from 'react'
+import { money, qty as roundQty } from '@shared/money'
 import { Button } from '../../components/ui/Button'
 import { NumberInput, Select } from '../../components/ui/Field'
 import { Column, DataTable } from '../../components/ui/DataTable'
@@ -18,7 +19,7 @@ interface BillLinesProps {
   containerRef: RefObject<HTMLDivElement | null>
 }
 
-const FIELD_NAME = /^bill-(qty|rate|discount)-(\d+)$/
+const FIELD_NAME = /^bill-(qty|rate|discount|amount)-(\d+)$/
 
 /** Shown next to a rate the customer was given last time. */
 const PRICE_FLAG: Partial<Record<BillLine['priceSource'], string>> = {
@@ -177,7 +178,19 @@ export function BillLines({
       header: `Amount (${currency})`,
       numeric: true,
       width: '130px',
-      render: (line) => <strong>{format.money(line.qty * line.rate - line.lineDiscount)}</strong>
+      // Editable, so a weight sale can be entered as money: type "250" and the
+      // quantity is back-solved from the rate — "give me 250 of sugar".
+      render: (line, index) => (
+        <NumberInput
+          name={`bill-amount-${index}`}
+          value={money(line.qty * line.rate - line.lineDiscount)}
+          onValueChange={(value) => {
+            if (line.rate > 0) {
+              onUpdate(line.key, { qty: roundQty((value + line.lineDiscount) / line.rate) })
+            }
+          }}
+        />
+      )
     },
     {
       key: 'remove',

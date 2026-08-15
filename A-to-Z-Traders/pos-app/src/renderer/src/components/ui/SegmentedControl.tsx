@@ -95,7 +95,7 @@ export function SegmentedControl<T extends string>({
             className={clsx(
               'border-r border-line text-caption font-medium whitespace-nowrap last:border-r-0',
               'disabled:cursor-not-allowed disabled:opacity-45',
-              fullWidth ? 'h-[34px] flex-1 px-2' : 'h-8 px-4',
+              fullWidth ? 'h-[38px] flex-1 px-2' : 'h-8 px-4',
               active
                 ? 'bg-accent text-white'
                 : 'text-ink-muted hover:not-disabled:bg-surface-hover hover:not-disabled:text-ink'

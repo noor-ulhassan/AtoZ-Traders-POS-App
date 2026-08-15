@@ -10,7 +10,7 @@ import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Select, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
-import { Column, DataTable } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { SummaryList } from '../../components/ui/SummaryList'
 import { PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useMutation } from '../../hooks/useMutation'
@@ -130,12 +130,10 @@ export function PurchaseEntryPage(): JSX.Element {
       key: 'product',
       header: 'Item',
       render: (line) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{line.product.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-subtle)' }}>
-            In stock: {format.qtyWithUnit(line.product.stockQty, line.product.baseUnit)}
-          </div>
-        </div>
+        <PrimaryCell
+          title={line.product.name}
+          subtitle={`In stock: ${format.qtyWithUnit(line.product.stockQty, line.product.baseUnit)}`}
+        />
       )
     },
     {

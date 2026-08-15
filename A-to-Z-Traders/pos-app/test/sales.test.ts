@@ -463,3 +463,37 @@ describe('tax never inflates sales or profit', () => {
     expect(pnl.netProfit).toBe(500)
   })
 })
+
+describe('opening stock and weight-sold products', () => {
+  // Guards the ProductForm warning's premise: opening stock must carry its cost
+  // into COGS, and a product counted in kg must sell at a fractional quantity.
+  it('carries opening-stock cost into profit and sells by weight', () => {
+    const ghee = productService.addProduct({
+      name: 'Loose ghee',
+      baseUnit: 'kg',
+      costPrice: 900, // cost of the opening stock
+      salePrice: 1200,
+      reorderLevel: 0,
+      openingStock: 5,
+      units: []
+    })
+
+    const fresh = productService.getProduct(ghee.id)
+    expect(fresh.stockQty).toBe(5)
+    expect(fresh.costPrice).toBe(900)
+
+    // Sell 2.5 kg — a fractional, weight-based quantity.
+    salesService.createSale({
+      items: [{ productId: ghee.id, unitName: 'kg', qty: 2.5, rate: 1200 }],
+      paymentType: 'cash',
+      paidAmount: 3000
+    })
+
+    expect(productService.getProduct(ghee.id).stockQty).toBe(2.5)
+
+    const pnl = reportService.profitAndLoss({ from: today(), to: today() })
+    expect(pnl.netSales).toBe(3000) // 2.5 × 1200
+    expect(pnl.cogs).toBe(2250) // 2.5 × 900  — not zero
+    expect(pnl.grossProfit).toBe(750)
+  })
+})

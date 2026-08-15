@@ -129,6 +129,17 @@ export function sumMovements(db: Db, productId: Id): number {
 }
 
 /** Products whose cached `stock_qty` has drifted from the movement ledger. */
+/** True once any stock movement exists for a product — even if it later sold to
+ *  zero. The base unit must stay fixed past this point (Guide §1.6). */
+export function hasMovements(db: Db, productId: Id): boolean {
+  const row = db
+    .prepare<[Id], { present: number }>(
+      'SELECT EXISTS(SELECT 1 FROM stock_movements WHERE product_id = ?) AS present'
+    )
+    .get(productId)
+  return row?.present === 1
+}
+
 export function findStockDrift(db: Db): { productId: Id; cached: number; actual: number }[] {
   return db
     .prepare<[], { product_id: number; cached: number; actual: number }>(

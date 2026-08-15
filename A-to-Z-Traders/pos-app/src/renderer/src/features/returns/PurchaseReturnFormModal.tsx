@@ -8,7 +8,7 @@ import { ChosenValue } from '../../components/ui/ChosenValue'
 import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Select, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
-import { Column, DataTable } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { Modal } from '../../components/ui/Modal'
 import { SummaryList } from '../../components/ui/SummaryList'
 import { useMutation } from '../../hooks/useMutation'
@@ -113,12 +113,10 @@ export function PurchaseReturnFormModal({
       key: 'product',
       header: 'Item',
       render: (line) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{line.product.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-subtle)' }}>
-            In stock: {format.qtyWithUnit(line.product.stockQty, line.product.baseUnit)}
-          </div>
-        </div>
+        <PrimaryCell
+          title={line.product.name}
+          subtitle={`In stock: ${format.qtyWithUnit(line.product.stockQty, line.product.baseUnit)}`}
+        />
       )
     },
     {

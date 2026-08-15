@@ -16,7 +16,7 @@ interface ChosenValueProps {
  */
 export function ChosenValue({ children, onClear, clearLabel }: ChosenValueProps): JSX.Element {
   return (
-    <div className="flex h-[34px] items-center justify-between gap-2 overflow-hidden rounded-md border border-line bg-surface-sunken pr-2 pl-3 text-sm whitespace-nowrap">
+    <div className="flex h-[38px] items-center justify-between gap-2 overflow-hidden rounded-md border border-line bg-surface-sunken pr-2 pl-3 text-sm whitespace-nowrap">
       <span className="truncate">{children}</span>
       {onClear && <Button variant="ghost" icon="close" aria-label={clearLabel} onClick={onClear} />}
     </div>

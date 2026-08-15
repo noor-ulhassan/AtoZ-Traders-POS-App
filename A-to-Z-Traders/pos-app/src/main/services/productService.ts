@@ -25,7 +25,11 @@ export function getProduct(id: Id): ProductWithUnits {
   const db = getDb()
   const product = products.findProduct(db, id)
   if (!product) throw notFound('Product')
-  return { ...product, units: products.listUnits(db, id) }
+  return {
+    ...product,
+    units: products.listUnits(db, id),
+    hasStockHistory: stock.hasMovements(db, id)
+  }
 }
 
 /** Throws unless the product exists — used by every module that references one. */

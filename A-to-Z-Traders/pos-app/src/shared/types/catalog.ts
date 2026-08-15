@@ -44,6 +44,8 @@ export interface Product {
 /** A product plus its alternate units — what the sale/purchase screens need. */
 export interface ProductWithUnits extends Product {
   units: ProductUnit[]
+  /** True once any stock movement exists — the base unit can no longer change. */
+  hasStockHistory: boolean
 }
 
 export interface ProductFilters {

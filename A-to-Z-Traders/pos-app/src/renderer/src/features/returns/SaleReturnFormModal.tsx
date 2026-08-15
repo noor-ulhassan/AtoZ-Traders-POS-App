@@ -8,7 +8,7 @@ import { ChosenValue } from '../../components/ui/ChosenValue'
 import { Combobox } from '../../components/ui/Combobox'
 import { Field, Input, NumberInput, Select, Textarea } from '../../components/ui/Field'
 import { Callout } from '../../components/ui/Feedback'
-import { Column, DataTable } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
 import { Modal } from '../../components/ui/Modal'
 import { SummaryList } from '../../components/ui/SummaryList'
 import { useDebounced } from '../../hooks/useDebounced'
@@ -155,12 +155,10 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
       key: 'product',
       header: 'Item',
       render: (line) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{line.product.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-subtle)' }}>
-            Back in stock: {format.qtyWithUnit(line.qty * line.factor, line.product.baseUnit)}
-          </div>
-        </div>
+        <PrimaryCell
+          title={line.product.name}
+          subtitle={`Back in stock: ${format.qtyWithUnit(line.qty * line.factor, line.product.baseUnit)}`}
+        />
       )
     },
     {

@@ -20,7 +20,10 @@ interface UnitsEditorProps {
 }
 
 /**
- * Alternate selling units, e.g. "1 box = 24 pieces".
+ * Alternate units a product is bought or sold in, e.g. "1 box = 24 pieces" or
+ * "1 sack = 50 kg". They can be larger than the base unit (a box, a sack) or
+ * smaller (a 250 g pack of a kg-counted product): the "contains" amount is any
+ * positive number, whole or fractional.
  *
  * The base unit is implicit and always first at factor 1, so it is shown as a
  * fixed line rather than an editable row — letting someone define a second
@@ -28,7 +31,7 @@ interface UnitsEditorProps {
  *
  * Leaving the price blank is meaningful: the unit then sells at the base price
  * times its factor, which is what most shops want and what stops a box price
- * from silently going stale when the piece price changes.
+ * from silently going stale when the base price changes.
  */
 export function UnitsEditor({
   baseUnit,
@@ -53,8 +56,9 @@ export function UnitsEditor({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-caption leading-normal text-ink-subtle">
-        Stock is always counted in {baseUnit || 'the base unit'}. Add a larger unit here if you also
-        sell by the box, dozen or bag.
+        Stock is counted in {baseUnit || 'the base unit'}. Add any other unit you buy or sell in — a
+        bigger pack (a box of 24, a 50 {baseUnit || 'unit'} sack) or a smaller measure. The amount
+        it contains can be a fraction.
       </p>
 
       {units.length === 0 ? (
