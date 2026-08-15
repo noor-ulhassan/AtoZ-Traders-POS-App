@@ -235,6 +235,29 @@ export function soldBaseQty(db: Db, saleId: Id, productId: Id): number {
 
 // -------------------------------------------------------- purchase returns
 
+/** Base quantity a purchase brought in for a product, to cap over-returns. */
+export function purchasedBaseQty(db: Db, purchaseId: Id, productId: Id): number {
+  const row = db
+    .prepare<[Id, Id], { total: number | null }>(
+      'SELECT SUM(base_qty) AS total FROM purchase_items WHERE purchase_id = ? AND product_id = ?'
+    )
+    .get(purchaseId, productId)
+  return qty(row?.total ?? 0)
+}
+
+/** Base quantity already returned against a purchase line. */
+export function returnedPurchaseBaseQty(db: Db, purchaseId: Id, productId: Id): number {
+  const row = db
+    .prepare<[Id, Id], { total: number | null }>(
+      `SELECT SUM(i.base_qty) AS total
+         FROM purchase_return_items i
+         JOIN purchase_returns r ON r.id = i.purchase_return_id
+        WHERE r.purchase_id = ? AND i.product_id = ?`
+    )
+    .get(purchaseId, productId)
+  return qty(row?.total ?? 0)
+}
+
 interface PurchaseReturnRow {
   id: number
   purchase_id: number | null

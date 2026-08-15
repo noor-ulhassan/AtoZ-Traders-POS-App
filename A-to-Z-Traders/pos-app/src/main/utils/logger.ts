@@ -1,6 +1,20 @@
 import { app } from 'electron'
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+
+// Cap the log so it cannot grow without bound on a machine that runs for years.
+// At the limit the current file becomes main.log.1 (overwriting the previous
+// backup) and a fresh main.log starts — so at most ~10 MB of logs are kept.
+const MAX_LOG_BYTES = 5 * 1024 * 1024
+
+function rotateIfLarge(file: string): void {
+  try {
+    if (statSync(file).size < MAX_LOG_BYTES) return
+    renameSync(file, `${file}.1`)
+  } catch {
+    // No file yet, or the rename lost a race — either way, keep logging.
+  }
+}
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
@@ -56,6 +70,7 @@ function write(level: Level, scope: string, message: string, extra: unknown[]): 
     const file = resolveLogFile()
     if (file) {
       try {
+        rotateIfLarge(file)
         appendFileSync(file, `${line}\n`, 'utf8')
       } catch {
         /* ignore */

@@ -20,6 +20,22 @@ import { recordMovement } from './inventoryService'
 import { requireParty } from './partyService'
 import { requireProduct, resolveUnit } from './productService'
 
+// --------------------------------------------------------------- helpers
+
+/** Total base quantity requested per product across a return's lines. */
+function aggregateBaseQty(lines: { product: { id: Id }; baseQty: number }[]): Map<Id, number> {
+  const totals = new Map<Id, number>()
+  for (const line of lines) {
+    totals.set(line.product.id, qty((totals.get(line.product.id) ?? 0) + line.baseQty))
+  }
+  return totals
+}
+
+/** The product behind an aggregated total, for a human-readable error. */
+function productOf<P extends { id: Id }>(lines: { product: P }[], productId: Id): P {
+  return lines.find((line) => line.product.id === productId)!.product
+}
+
 // ------------------------------------------------------------ sale returns
 
 export function listSaleReturns(filters: ReturnFilters = {}): Page<SaleReturn> {
@@ -77,16 +93,6 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
         ? returns.findOriginalSaleCost(db, saleId, product.id, unit.unitName)
         : null) ?? product.costPrice
 
-    if (saleId != null) {
-      const sold = returns.soldBaseQty(db, saleId, product.id)
-      const already = returns.returnedBaseQty(db, saleId, product.id)
-      if (qty(already + baseQty) > sold) {
-        throw businessRule(
-          `Only ${qty(sold - already)} ${product.baseUnit} of "${product.name}" are left to return on this bill.`
-        )
-      }
-    }
-
     return {
       product,
       unitName: unit.unitName,
@@ -98,6 +104,23 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
       amount: money(lineQty * item.rate)
     }
   })
+
+  // Cap the return against what the bill still has left — aggregated per
+  // product, so two lines of the same item (a carton and loose pieces, say)
+  // cannot each look small enough to pass while their sum exceeds what was
+  // sold. Checking line-by-line was the bug this replaces.
+  if (saleId != null) {
+    for (const [productId, need] of aggregateBaseQty(lines)) {
+      const sold = returns.soldBaseQty(db, saleId, productId)
+      const already = returns.returnedBaseQty(db, saleId, productId)
+      if (qty(already + need) > sold) {
+        const { name, baseUnit } = productOf(lines, productId)
+        throw businessRule(
+          `Only ${qty(sold - already)} ${baseUnit} of "${name}" are left to return on this bill.`
+        )
+      }
+    }
+  }
 
   const total = sumMoney(lines.map((line) => line.amount))
 
@@ -191,12 +214,6 @@ export function createPurchaseReturn(input: PurchaseReturnInput): PurchaseReturn
     const costPerBase =
       item.unitCost != null ? money(item.unitCost / unit.factor) : product.costPrice
 
-    if (baseQty > qty(product.stockQty)) {
-      throw businessRule(
-        `Only ${product.stockQty} ${product.baseUnit} of "${product.name}" are in stock; the return needs ${baseQty}.`
-      )
-    }
-
     return {
       product,
       unitName: unit.unitName,
@@ -207,6 +224,28 @@ export function createPurchaseReturn(input: PurchaseReturnInput): PurchaseReturn
       amount: money(baseQty * costPerBase)
     }
   })
+
+  // Aggregate per product before checking: duplicate lines of the same item
+  // must not each pass a check their sum would fail. Stock may never be driven
+  // below zero, and a return linked to a purchase cannot exceed what that bill
+  // brought in (net of earlier returns against it).
+  for (const [productId, need] of aggregateBaseQty(lines)) {
+    const { name, baseUnit, stockQty } = productOf(lines, productId)
+    if (need > qty(stockQty)) {
+      throw businessRule(
+        `Only ${stockQty} ${baseUnit} of "${name}" are in stock; the return needs ${need}.`
+      )
+    }
+    if (purchaseId != null) {
+      const purchased = returns.purchasedBaseQty(db, purchaseId, productId)
+      const already = returns.returnedPurchaseBaseQty(db, purchaseId, productId)
+      if (qty(already + need) > purchased) {
+        throw businessRule(
+          `Only ${qty(purchased - already)} ${baseUnit} of "${name}" are left to return on this purchase.`
+        )
+      }
+    }
+  }
 
   const total = sumMoney(lines.map((line) => line.amount))
 

@@ -7,6 +7,7 @@ import { currentVersion, migrate } from '../db/migrate'
 import { getSettings } from '../repositories/settingsRepository'
 import { getDb } from '../db/connection'
 import { AppError, businessRule } from '../utils/errors'
+import { underMaintenance } from '../ipc/maintenance'
 import { logger } from '../utils/logger'
 
 const log = logger.child('backup')
@@ -103,26 +104,31 @@ export async function restoreFromFile(): Promise<RestoreResult> {
   const live = databasePath()
   const safetyCopy = join(app.getPath('userData'), `pos-before-restore-${stamp()}.db`)
 
-  checkpoint()
-  closeDatabase()
+  // Turn business IPC away while the connection is closed and the file swapped,
+  // so a sale firing from the renderer mid-restore cannot touch a database that
+  // is about to be replaced.
+  return underMaintenance(async () => {
+    checkpoint()
+    closeDatabase()
 
-  try {
-    renameSync(live, safetyCopy)
-    copyFileSync(source, live)
-  } catch (error) {
-    // Put things back exactly as they were before re-opening.
-    if (!existsSync(live) && existsSync(safetyCopy)) renameSync(safetyCopy, live)
-    setDb(openDatabase())
-    log.error('restore failed', error)
-    throw businessRule('The backup could not be restored. Your existing data is unchanged.')
-  }
+    try {
+      renameSync(live, safetyCopy)
+      copyFileSync(source, live)
+    } catch (error) {
+      // Put things back exactly as they were before re-opening.
+      if (!existsSync(live) && existsSync(safetyCopy)) renameSync(safetyCopy, live)
+      setDb(openDatabase())
+      log.error('restore failed', error)
+      throw businessRule('The backup could not be restored. Your existing data is unchanged.')
+    }
 
-  const db = openDatabase()
-  setDb(db)
-  migrate(db)
+    const db = openDatabase()
+    setDb(db)
+    migrate(db)
 
-  log.info(`restored from ${source}; previous database kept at ${safetyCopy}`)
-  return { restoredFrom: source, safetyCopyPath: safetyCopy }
+    log.info(`restored from ${source}; previous database kept at ${safetyCopy}`)
+    return { restoredFrom: source, safetyCopyPath: safetyCopy }
+  })
 }
 
 export function databaseInfo(): DatabaseInfo {

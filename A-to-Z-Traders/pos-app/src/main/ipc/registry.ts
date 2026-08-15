@@ -4,6 +4,7 @@ import type { IpcChannel } from '@shared/ipc'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type { IpcResult } from '@shared/types'
 import { isUnlocked } from '../auth/session'
+import { isBusy } from './maintenance'
 import { AppError, translateSqliteError } from '../utils/errors'
 import { logger } from '../utils/logger'
 
@@ -56,6 +57,12 @@ const LOCKED_RESULT: IpcResult<never> = {
   error: { code: 'AUTH', message: 'Please unlock the app to continue.' }
 }
 
+/** Returned while the database is being swapped by a restore. */
+const BUSY_RESULT: IpcResult<never> = {
+  ok: false,
+  error: { code: 'INTERNAL', message: 'The app is busy restoring data. Please try again in a moment.' }
+}
+
 export interface HandlerOptions {
   /**
    * When true the channel runs even while the app is locked. Reserved for the
@@ -88,6 +95,12 @@ export function registerHandler<Schema extends z.ZodTypeAny, Output>(
     if (!options.public && !isUnlocked()) {
       log.warn(`${channel} blocked: app is locked`)
       return LOCKED_RESULT
+    }
+
+    // Hold business channels off the database while a restore swaps the file.
+    if (!options.public && isBusy()) {
+      log.warn(`${channel} blocked: maintenance in progress`)
+      return BUSY_RESULT
     }
 
     const parsed = schema.safeParse(payload)

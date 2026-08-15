@@ -45,11 +45,18 @@ if (!hasLock) {
 
     createMainWindow()
 
+    // A shop machine can stay open for weeks. Auto-backup only on clean quit
+    // would mean a single power cut loses everything since the last close, so
+    // also snapshot on a timer (a no-op unless a backup folder is configured).
+    setInterval(runAutoBackup, SIX_HOURS).unref()
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
     })
   })
 }
+
+const SIX_HOURS = 6 * 60 * 60 * 1000
 
 let shuttingDown = false
 
@@ -75,6 +82,16 @@ function handleFatal(label: string, error: unknown): void {
   log.error(label, error)
   if (crashing) return
   crashing = true
+
+  // app.exit() below does NOT emit 'before-quit', so the normal auto-backup is
+  // skipped on a crash — the one time a fresh snapshot matters most. Take it
+  // here, before the connection is closed. Every completed write is already on
+  // disk; this just captures it somewhere safe.
+  try {
+    runAutoBackup()
+  } catch (backupError) {
+    log.error('crash-time auto-backup failed', backupError)
+  }
 
   try {
     closeDatabase()
