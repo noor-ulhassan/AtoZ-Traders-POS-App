@@ -13,6 +13,7 @@ import { SalesTrendChart } from '../../components/ui/charts/SalesTrendChart'
 import { TopProductsChart } from '../../components/ui/charts/TopProductsChart'
 import { DailyBillsChart } from '../../components/ui/charts/DailyBillsChart'
 import { FinancialPositionChart } from '../../components/ui/charts/FinancialPositionChart'
+import { GrossMarginChart } from '../../components/ui/charts/GrossMarginChart'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
@@ -207,7 +208,15 @@ export function DashboardPage(): JSX.Element {
           </div>
 
           <div className="flex flex-col gap-5">
-            <SetupChecklist settings={settings} info={info.data} />
+            <Card>
+              <CardHeader
+                title="Sales composition"
+                subtitle="Cost of goods vs profit this period"
+              />
+              <CardBody>
+                <GrossMarginChart sales={data?.sales ?? 0} profit={data?.profit ?? 0} />
+              </CardBody>
+            </Card>
 
             <Card>
               <CardHeader title="Financial position" subtitle="Where your money stands today" />
@@ -253,6 +262,8 @@ export function DashboardPage(): JSX.Element {
                 <TopProductsChart rows={data?.topProducts ?? []} />
               </CardBody>
             </Card>
+
+            <SetupChecklist settings={settings} info={info.data} />
           </div>
         </div>
       </PageBody>
