@@ -14,6 +14,32 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
 }
 
+interface ParsedCombo {
+  key: string
+  ctrl: boolean
+  shift: boolean
+  alt: boolean
+}
+
+function parseCombo(combo: string): ParsedCombo {
+  const parts = combo.toLowerCase().split('+')
+  return {
+    key: parts[parts.length - 1] ?? '',
+    ctrl: parts.includes('ctrl'),
+    shift: parts.includes('shift'),
+    alt: parts.includes('alt')
+  }
+}
+
+function matchesCombo(event: KeyboardEvent, combo: ParsedCombo): boolean {
+  return (
+    event.key.toLowerCase() === combo.key &&
+    event.ctrlKey === combo.ctrl &&
+    event.altKey === combo.alt &&
+    event.shiftKey === combo.shift
+  )
+}
+
 /**
  * Binds a single keyboard shortcut.
  *
@@ -36,16 +62,10 @@ export function useHotkey(combo: string, handler: Handler, options: Options = {}
   useEffect(() => {
     if (!enabled) return
 
-    const parts = combo.toLowerCase().split('+')
-    const key = parts[parts.length - 1] ?? ''
-    const needsCtrl = parts.includes('ctrl')
-    const needsShift = parts.includes('shift')
-    const needsAlt = parts.includes('alt')
+    const parsed = parseCombo(combo)
 
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key.toLowerCase() !== key) return
-      if (event.ctrlKey !== needsCtrl || event.altKey !== needsAlt) return
-      if (event.shiftKey !== needsShift) return
+      if (!matchesCombo(event, parsed)) return
       if (!allowInInput && isTypingTarget(event.target)) return
 
       event.preventDefault()
@@ -55,4 +75,43 @@ export function useHotkey(combo: string, handler: Handler, options: Options = {}
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [combo, allowInInput, enabled])
+}
+
+export interface HotkeyBinding {
+  combo: string
+  handler: Handler
+}
+
+/**
+ * Binds several keyboard shortcuts at once, e.g. one per sidebar nav item.
+ *
+ * A plain loop of `useHotkey()` calls would break the Rules of Hooks (the
+ * list length isn't fixed at compile time), so this registers one listener
+ * that checks each binding in turn instead.
+ */
+export function useHotkeys(bindings: HotkeyBinding[], options: Options = {}): void {
+  const { allowInInput = false, enabled = true } = options
+  const bindingsRef = useRef(bindings)
+
+  useEffect(() => {
+    bindingsRef.current = bindings
+  })
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!allowInInput && isTypingTarget(event.target)) return
+      const match = bindingsRef.current.find((binding) =>
+        matchesCombo(event, parseCombo(binding.combo))
+      )
+      if (!match) return
+
+      event.preventDefault()
+      match.handler(event)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [allowInInput, enabled])
 }

@@ -1,9 +1,10 @@
 import clsx from 'clsx'
 import type { JSX } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useHotkey } from '../../hooks/useHotkey'
+import { useHotkeys } from '../../hooks/useHotkey'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { NAVIGATION } from './navigation'
+import type { NavItem } from './navigation'
 import { Sidebar } from './Sidebar'
 
 /** Screens that manage their own scroll region, so the shell must not pad them. */
@@ -17,14 +18,17 @@ export function AppShell(): JSX.Element {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const shortcuts = NAVIGATION.flatMap((group) => group.items).filter((item) => item.hotkey)
+  const shortcuts = NAVIGATION.flatMap((group) => group.items).filter(
+    (item): item is NavItem & { hotkey: string } => Boolean(item.hotkey)
+  )
   const flush = FLUSH_ROUTES.some((route) => location.pathname.startsWith(route))
 
   // Registering per item keeps the shortcut next to its nav entry, which is
   // where anyone looking for it will check first.
-  useHotkey(shortcuts[0]?.hotkey ?? 'F2', () => navigate(shortcuts[0]?.to ?? '/billing'), {
-    allowInInput: true
-  })
+  useHotkeys(
+    shortcuts.map((item) => ({ combo: item.hotkey, handler: () => navigate(item.to) })),
+    { allowInInput: true }
+  )
 
   return (
     <div className="grid h-screen grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden">

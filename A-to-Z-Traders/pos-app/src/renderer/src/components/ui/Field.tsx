@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import type { ComponentPropsWithRef, JSX, ReactNode } from 'react'
-import { useEffect, useId, useState } from 'react'
+import type { ComponentPropsWithRef, JSX, ReactElement, ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useId, useState } from 'react'
 import { Icon } from '../icons/Icon'
 
 /**
@@ -47,6 +47,27 @@ export function Field({
   children,
   className
 }: FieldProps): JSX.Element {
+  // Most fields wrap a single Input/Select/Textarea and never pass `htmlFor`.
+  // Without a matching id, the <label> has no programmatic association with
+  // its control: clicking the label doesn't focus it, and screen readers
+  // can't announce it. Auto-generate one and thread it onto that lone child —
+  // but only when the caller hasn't already taken control (explicit
+  // `htmlFor`, or a child that already sets its own `id`), and only when the
+  // child is a single real element (custom multi-node fields render as-is).
+  const autoId = useId()
+  const onlyChild = Children.count(children) === 1 ? children : null
+  const canAutoWire =
+    !htmlFor &&
+    Boolean(label) &&
+    isValidElement(onlyChild) &&
+    (onlyChild.props as { id?: string }).id === undefined
+
+  const fieldId = htmlFor ?? (canAutoWire ? autoId : undefined)
+  const content =
+    canAutoWire && isValidElement(onlyChild)
+      ? cloneElement(onlyChild as ReactElement<{ id?: string }>, { id: fieldId })
+      : children
+
   return (
     <div className={clsx('flex min-w-0 flex-col gap-1', className)}>
       {label && (
@@ -55,12 +76,12 @@ export function Field({
             'text-caption font-medium text-ink-muted',
             required && 'after:ml-0.5 after:text-bad after:content-["*"]'
           )}
-          htmlFor={htmlFor}
+          htmlFor={fieldId}
         >
           {label}
         </label>
       )}
-      {children}
+      {content}
       {error ? (
         <span className="text-caption text-bad">{error}</span>
       ) : (

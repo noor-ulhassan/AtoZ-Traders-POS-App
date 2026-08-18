@@ -56,6 +56,10 @@ export function BillingPage(): JSX.Element {
   const [paymentType, setPaymentType] = useState<PaymentType>('cash')
   const [paidAmount, setPaidAmount] = useState(0)
   const [saved, setSaved] = useState<{ receipt: Receipt; saleId: number } | null>(null)
+  // Blocks the page's own hotkeys while the "Clear this bill?" confirmation is
+  // up — otherwise a reflexive Ctrl+Enter fires `submit()` on the still-intact
+  // cart underneath the dialog, saving a sale the owner meant to discard.
+  const [confirmingClear, setConfirmingClear] = useState(false)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const paidRef = useRef<HTMLInputElement>(null)
@@ -144,18 +148,23 @@ export function BillingPage(): JSX.Element {
   }
 
   const clearBill = async (): Promise<void> => {
-    if (bill.lines.length === 0) return
-    const ok = await confirm({
-      title: 'Clear this bill?',
-      message: 'The items entered so far will be discarded.',
-      confirmLabel: 'Clear bill',
-      destructive: true
-    })
-    if (ok) {
-      bill.reset()
-      setPaidAmount(0)
-      setPaymentType('cash')
-      searchRef.current?.focus()
+    if (bill.lines.length === 0 || confirmingClear) return
+    setConfirmingClear(true)
+    try {
+      const ok = await confirm({
+        title: 'Clear this bill?',
+        message: 'The items entered so far will be discarded.',
+        confirmLabel: 'Clear bill',
+        destructive: true
+      })
+      if (ok) {
+        bill.reset()
+        setPaidAmount(0)
+        setPaymentType('cash')
+        searchRef.current?.focus()
+      }
+    } finally {
+      setConfirmingClear(false)
     }
   }
 
@@ -181,13 +190,19 @@ export function BillingPage(): JSX.Element {
     target?.focus()
   }
 
-  useHotkey('F2', focusSearch, { allowInInput: true })
-  useHotkey('F3', focusLastQty, { allowInInput: true })
-  useHotkey('F4', () => paidRef.current?.focus(), { allowInInput: true })
-  useHotkey('F6', () => customerRef.current?.focus(), { allowInInput: true })
-  useHotkey('F7', focusPayment, { allowInInput: true })
-  useHotkey('ctrl+enter', () => void submit(), { allowInInput: true })
-  useHotkey('F8', () => void clearBill(), { allowInInput: true })
+  // Disabled while the clear-bill confirmation is open, so a reflexive
+  // Ctrl+Enter (or any other page hotkey) cannot act on the cart underneath
+  // an open "Clear this bill?" dialog.
+  useHotkey('F2', focusSearch, { allowInInput: true, enabled: !confirmingClear })
+  useHotkey('F3', focusLastQty, { allowInInput: true, enabled: !confirmingClear })
+  useHotkey('F4', () => paidRef.current?.focus(), { allowInInput: true, enabled: !confirmingClear })
+  useHotkey('F6', () => customerRef.current?.focus(), {
+    allowInInput: true,
+    enabled: !confirmingClear
+  })
+  useHotkey('F7', focusPayment, { allowInInput: true, enabled: !confirmingClear })
+  useHotkey('ctrl+enter', () => void submit(), { allowInInput: true, enabled: !confirmingClear })
+  useHotkey('F8', () => void clearBill(), { allowInInput: true, enabled: !confirmingClear })
 
   const needsCustomer = due > 0.005 && !bill.customer
 
