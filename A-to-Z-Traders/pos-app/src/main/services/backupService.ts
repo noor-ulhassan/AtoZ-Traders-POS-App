@@ -1,4 +1,5 @@
 import { app, dialog } from 'electron'
+import Database from 'better-sqlite3'
 import { copyFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { BackupResult, DatabaseInfo, RestoreResult } from '@shared/types'
@@ -66,6 +67,43 @@ export async function backupNow(): Promise<BackupResult> {
 }
 
 /**
+ * Confirms the chosen file is a usable POS backup before anything destructive
+ * happens.
+ *
+ * Opened read-only and never touched. better-sqlite3 validates lazily — a
+ * file that isn't SQLite at all opens without error and only fails on the
+ * first real query — so "not a database" and "a database, but not ours" are
+ * both handled as query-time failures. Without this, either case would only
+ * surface after the live database was already overwritten: the first as a
+ * broken app with no automatic way back, the second as a silent,
+ * error-free wipe down to zero data.
+ */
+export function assertUsableBackup(path: string): void {
+  let probe: Database.Database
+  try {
+    probe = new Database(path, { readonly: true, fileMustExist: true })
+  } catch {
+    throw businessRule('That file could not be opened as a database. Choose a different backup.')
+  }
+
+  try {
+    const row = probe
+      .prepare<[], { n: number }>(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('products', 'sales', 'schema_migrations')"
+      )
+      .get()
+    if (!row || row.n < 3) {
+      throw businessRule('That file does not look like a POS backup.')
+    }
+  } catch (error) {
+    if (error instanceof AppError) throw error
+    throw businessRule('That file could not be opened as a database. Choose a different backup.')
+  } finally {
+    probe.close()
+  }
+}
+
+/**
  * Replaces the live database with a backup file.
  *
  * The current database is never deleted — it is renamed aside first, so a
@@ -86,6 +124,7 @@ export async function restoreFromFile(): Promise<RestoreResult> {
 
   const source = filePaths[0] as string
   if (!existsSync(source)) throw businessRule('That backup file no longer exists.')
+  assertUsableBackup(source)
 
   // Confirm destructively, in the main process, where it cannot be bypassed.
   const { response } = await dialog.showMessageBox({

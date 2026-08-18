@@ -225,7 +225,7 @@ export function PurchaseEntryPage(): JSX.Element {
             <Button
               variant="primary"
               loading={save.isPending}
-              disabled={lines.length === 0}
+              disabled={lines.length === 0 || (owing > 0.005 && !supplier)}
               onClick={() => void save.run()}
             >
               Save purchase

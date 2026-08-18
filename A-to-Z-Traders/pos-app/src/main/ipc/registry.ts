@@ -60,7 +60,10 @@ const LOCKED_RESULT: IpcResult<never> = {
 /** Returned while the database is being swapped by a restore. */
 const BUSY_RESULT: IpcResult<never> = {
   ok: false,
-  error: { code: 'INTERNAL', message: 'The app is busy restoring data. Please try again in a moment.' }
+  error: {
+    code: 'INTERNAL',
+    message: 'The app is busy restoring data. Please try again in a moment.'
+  }
 }
 
 export interface HandlerOptions {

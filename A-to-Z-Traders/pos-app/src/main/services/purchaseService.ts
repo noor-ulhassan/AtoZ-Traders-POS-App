@@ -81,6 +81,13 @@ export function createPurchase(input: PurchaseInput): PurchaseWithItems {
     throw businessRule('Paying more than the total requires a supplier to hold the advance.')
   }
 
+  // Whatever is not paid now is owed to the supplier; with no supplier to
+  // carry it, an unpaid amount would vanish instead of tracking as a debt.
+  const unpaid = money(total - paidAmount)
+  if (unpaid > 0 && supplierId == null) {
+    throw businessRule('Select a supplier before leaving an amount unpaid.')
+  }
+
   const create = db.transaction(() => {
     const purchaseId = purchases.insertPurchase(db, {
       supplierId,
@@ -128,8 +135,6 @@ export function createPurchase(input: PurchaseInput): PurchaseWithItems {
       })
     }
 
-    // Whatever is not paid now is owed to the supplier.
-    const unpaid = money(total - paidAmount)
     if (supplierId != null && unpaid !== 0) {
       parties.applyBalanceDelta(db, 'supplier', supplierId, unpaid)
     }
