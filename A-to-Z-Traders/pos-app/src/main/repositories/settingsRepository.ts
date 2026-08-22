@@ -6,6 +6,8 @@ interface SettingsRow {
   business_name: string
   address: string
   phone: string
+  email: string
+  website: string
   tax_number: string
   tax_enabled: number
   tax_rate: number
@@ -20,6 +22,8 @@ const COLUMNS: Record<keyof Settings, keyof SettingsRow> = {
   businessName: 'business_name',
   address: 'address',
   phone: 'phone',
+  email: 'email',
+  website: 'website',
   taxNumber: 'tax_number',
   taxEnabled: 'tax_enabled',
   taxRate: 'tax_rate',
@@ -34,6 +38,8 @@ function toSettings(row: SettingsRow): Settings {
     businessName: row.business_name,
     address: row.address,
     phone: row.phone,
+    email: row.email,
+    website: row.website,
     taxNumber: row.tax_number,
     taxEnabled: toBool(row.tax_enabled),
     taxRate: row.tax_rate,

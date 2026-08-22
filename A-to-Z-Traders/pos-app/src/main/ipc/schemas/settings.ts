@@ -5,6 +5,8 @@ export const settingsUpdateSchema = z
     businessName: z.string().trim().max(120),
     address: z.string().trim().max(300),
     phone: z.string().trim().max(60),
+    email: z.string().trim().max(160),
+    website: z.string().trim().max(200),
     taxNumber: z.string().trim().max(60),
     taxEnabled: z.boolean(),
     taxRate: z

@@ -121,13 +121,16 @@ export function SettingsPage(): JSX.Element {
           <div className="flex flex-col gap-5">
             <Card>
               <CardHeader
-                title="Business details"
-                subtitle="These appear on every bill you print"
+                title="Business profile"
+                subtitle="Your name and contact details — shown in the app and on every bill you print"
               />
               <CardBody>
                 <FormGrid>
                   <GridCell span={8}>
-                    <Field label="Business name">
+                    <Field
+                      label="Business name"
+                      hint="Used as the app name in the sidebar, window title, and on bills"
+                    >
                       <Input
                         value={form.businessName}
                         placeholder="A to Z Traders"
@@ -141,6 +144,27 @@ export function SettingsPage(): JSX.Element {
                       <Input
                         value={form.phone}
                         onChange={(event) => set('phone', event.target.value)}
+                      />
+                    </Field>
+                  </GridCell>
+
+                  <GridCell span={6}>
+                    <Field label="Email">
+                      <Input
+                        type="email"
+                        value={form.email}
+                        placeholder="shop@example.com"
+                        onChange={(event) => set('email', event.target.value)}
+                      />
+                    </Field>
+                  </GridCell>
+
+                  <GridCell span={6}>
+                    <Field label="Website">
+                      <Input
+                        value={form.website}
+                        placeholder="www.example.com"
+                        onChange={(event) => set('website', event.target.value)}
                       />
                     </Field>
                   </GridCell>

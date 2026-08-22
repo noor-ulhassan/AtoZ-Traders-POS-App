@@ -2,6 +2,8 @@ export interface Settings {
   businessName: string
   address: string
   phone: string
+  email: string
+  website: string
   taxNumber: string
   taxEnabled: boolean
   /** percent, e.g. 17 means 17% */
