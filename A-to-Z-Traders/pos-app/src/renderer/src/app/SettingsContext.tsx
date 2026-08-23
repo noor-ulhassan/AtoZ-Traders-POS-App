@@ -14,6 +14,8 @@ const FALLBACK: Settings = {
   businessName: '',
   address: '',
   phone: '',
+  email: '',
+  website: '',
   taxNumber: '',
   taxEnabled: false,
   taxRate: 0,
@@ -59,6 +61,14 @@ export function SettingsProvider({ children }: { children: ReactNode }): JSX.Ele
   const save = useCallback(async (patch: SettingsUpdate) => {
     setSettings(await unwrap(api.settings.update(patch)))
   }, [])
+
+  // The window title is part of the app's identity, so it follows the business
+  // name the admin sets rather than a build-time constant. Empty name falls
+  // back to the generic product title.
+  useEffect(() => {
+    const name = settings.businessName.trim()
+    document.title = name ? `${name} — Point of Sale` : 'Wholesale POS'
+  }, [settings.businessName])
 
   const value = useMemo<SettingsContextValue>(
     () => ({ settings, save, reload }),

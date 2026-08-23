@@ -67,8 +67,9 @@ export function Sidebar(): JSX.Element {
         ))}
       </nav>
 
-      {/* Footer: the one lock action, then the maker's credit. Business info
-          for Noor will sit in the reserved block beneath the credit line. */}
+      {/* Footer: the one lock action, then the maker's credit. The business's
+          own name and contact details live in the app footer bar (AppFooter),
+          driven by Settings → Business profile. */}
       <div className="flex flex-col gap-3 border-t border-nav-line px-3 pt-3 pb-4">
         <button
           type="button"
@@ -88,8 +89,6 @@ export function Sidebar(): JSX.Element {
               {settings.currency} · v1.0
             </span>
           </div>
-          {/* Reserved for Noor's business details (phone · email · website),
-              added later — this block is sized to grow into them. */}
         </div>
       </div>
     </aside>

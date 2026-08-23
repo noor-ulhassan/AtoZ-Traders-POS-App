@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useHotkeys } from '../../hooks/useHotkey'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
+import { AppFooter } from './AppFooter'
 import { NAVIGATION } from './navigation'
 import type { NavItem } from './navigation'
 import { Sidebar } from './Sidebar'
@@ -48,6 +49,9 @@ export function AppShell(): JSX.Element {
             <Outlet />
           </ErrorBoundary>
         </div>
+        {/* Outside the scroll region, so the business identity stays pinned to
+            the bottom of every screen no matter how long the page is. */}
+        <AppFooter />
       </main>
     </div>
   )

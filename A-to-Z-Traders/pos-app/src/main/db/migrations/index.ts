@@ -1,5 +1,6 @@
 import init0001 from './0001_init.sql?raw'
 import adminAuth0002 from './0002_admin_auth.sql?raw'
+import businessProfile0003 from './0003_business_profile.sql?raw'
 
 export interface Migration {
   version: number
@@ -19,7 +20,8 @@ export interface Migration {
  */
 export const MIGRATIONS: Migration[] = [
   { version: 1, name: '0001_init', sql: init0001 },
-  { version: 2, name: '0002_admin_auth', sql: adminAuth0002 }
+  { version: 2, name: '0002_admin_auth', sql: adminAuth0002 },
+  { version: 3, name: '0003_business_profile', sql: businessProfile0003 }
 ]
 
 export const LATEST_VERSION = MIGRATIONS.reduce(
