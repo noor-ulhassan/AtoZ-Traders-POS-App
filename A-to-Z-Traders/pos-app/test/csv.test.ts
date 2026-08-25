@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { csvMoney, toCsv } from '../src/main/utils/csv'
+import type { ReportHeading } from '../src/main/utils/csv'
+import { csvMoney, toCsv, toReportCsv } from '../src/main/utils/csv'
 
 interface Row {
   label: string
@@ -37,5 +38,63 @@ describe('csv export', () => {
     expect(csvMoney(5)).toBe('5.00')
     expect(csvMoney(-5)).toBe('-5.00')
     expect(csvMoney(null)).toBe('')
+  })
+})
+
+interface Bill {
+  invoice: string
+  total: number
+}
+
+const heading: ReportHeading = {
+  businessName: 'A to Z Traders',
+  title: 'Sales Report',
+  fields: [
+    { label: 'Period', value: '2026-01-01 to 2026-01-31' },
+    { label: 'Currency', value: 'PKR' },
+    { label: 'Generated', value: '2026-01-31 18:00:00' }
+  ]
+}
+
+const billColumns = [
+  { header: 'Invoice', value: (r: Bill) => r.invoice },
+  { header: 'Total (PKR)', value: (r: Bill) => csvMoney(r.total), sum: (r: Bill) => r.total }
+]
+
+const bills: Bill[] = [
+  { invoice: 'INV-1', total: 100 },
+  { invoice: 'INV-2', total: 250.5 }
+]
+
+describe('report csv', () => {
+  it('prints a masthead, the period, a record count and the table', () => {
+    const csv = toReportCsv(heading, billColumns, bills)
+    expect(csv).toContain('A to Z Traders')
+    expect(csv).toContain('Sales Report')
+    expect(csv).toContain('Period,2026-01-01 to 2026-01-31')
+    expect(csv).toContain('Currency,PKR')
+    expect(csv).toContain('Records,2')
+    expect(csv).toContain('Invoice,Total (PKR)')
+    expect(csv).toContain('INV-1,100.00')
+    // Heading comes before the table, which comes before the totals.
+    expect(csv.indexOf('A to Z Traders')).toBeLessThan(csv.indexOf('Sales Report'))
+    expect(csv.indexOf('Sales Report')).toBeLessThan(csv.indexOf('Invoice,Total (PKR)'))
+  })
+
+  it('foots the summed columns in a TOTAL row', () => {
+    const csv = toReportCsv(heading, billColumns, bills)
+    // 100.00 + 250.50 = 350.50, under the Total column, with the TOTAL label in
+    // the first (unsummed) column.
+    expect(csv).toContain('TOTAL,350.50')
+  })
+
+  it('omits the TOTAL row when no column is summed', () => {
+    const csv = toReportCsv(heading, [{ header: 'Invoice', value: (r: Bill) => r.invoice }], bills)
+    expect(csv).not.toContain('TOTAL')
+  })
+
+  it('still guards CSV injection inside a report', () => {
+    const csv = toReportCsv(heading, billColumns, [{ invoice: '=cmd', total: 5 }])
+    expect(csv).toContain("'=cmd")
   })
 })
