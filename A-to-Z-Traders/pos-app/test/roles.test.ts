@@ -2,9 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createTestDb } from './helpers/database'
 import * as authService from '../src/main/services/authService'
 import * as userService from '../src/main/services/userService'
+import * as dashboardService from '../src/main/services/dashboardService'
+import * as expenseService from '../src/main/services/expenseService'
+import * as productService from '../src/main/services/productService'
+import * as purchaseService from '../src/main/services/purchaseService'
+import * as salesService from '../src/main/services/salesService'
 import { currentRole, lock as lockSession, unlock } from '../src/main/auth/session'
 import { isAuthorized } from '../src/main/ipc/registry'
 import { IPC_CHANNELS } from '../src/shared/ipc'
+import { today } from '../src/shared/date'
 import { getDb } from '../src/main/db/connection'
 import { findByUsername } from '../src/main/repositories/userRepository'
 
@@ -146,5 +152,60 @@ describe('access policy (fail-closed)', () => {
     expect(isAuthorized(IPC_CHANNELS.paymentsCreate, { input: { partyType: 'supplier' } })).toBe(
       false
     )
+  })
+})
+
+describe('dashboard redaction', () => {
+  const range = { from: today(), to: today() }
+
+  /** One credit sale at a profit, plus an expense, so every figure is non-zero. */
+  function seedTradingDay(): void {
+    const product = productService.addProduct({
+      name: 'Rice 25kg',
+      baseUnit: 'bag',
+      costPrice: 0,
+      salePrice: 3000,
+      reorderLevel: 5
+    })
+    purchaseService.createPurchase({
+      items: [{ productId: product.id, unitName: 'bag', qty: 20, unitCost: 2000 }],
+      paidAmount: 40000
+    })
+    const buyer = getDb().prepare('INSERT INTO customers (name) VALUES (?)').run('Khan Store')
+    salesService.createSale({
+      customerId: Number(buyer.lastInsertRowid),
+      items: [{ productId: product.id, unitName: 'bag', qty: 5, rate: 3000 }],
+      paymentType: 'credit',
+      paidAmount: 0
+    })
+    expenseService.addExpense({ title: 'Shop rent', amount: 5000 })
+  }
+
+  beforeEach(seedTradingDay)
+
+  it('gives the admin the full financial picture', () => {
+    unlock('admin')
+    const summary = dashboardService.getSummary(range)
+    expect(summary.sales).toBeGreaterThan(0)
+    expect(summary.profit).toBeGreaterThan(0)
+    expect(summary.expenses).toBe(5000)
+    expect(summary.receivables).toBeGreaterThan(0)
+    expect(summary.topProducts.length).toBeGreaterThan(0)
+  })
+
+  it('strips profit, expenses, cash and payables for a shopkeeper', () => {
+    unlock('shopkeeper', 'ali')
+    const summary = dashboardService.getSummary(range)
+    // Sensitive figures are zeroed in the payload itself.
+    expect(summary.profit).toBe(0)
+    expect(summary.expenses).toBe(0)
+    expect(summary.cashInHand).toBe(0)
+    expect(summary.payables).toBe(0)
+    expect(summary.topProducts).toEqual([])
+    expect(summary.trend.every((point) => point.profit === 0)).toBe(true)
+    // Operational figures a counter needs survive.
+    expect(summary.sales).toBeGreaterThan(0)
+    expect(summary.receivables).toBeGreaterThan(0)
+    expect(summary.recentSales.length).toBeGreaterThan(0)
   })
 })

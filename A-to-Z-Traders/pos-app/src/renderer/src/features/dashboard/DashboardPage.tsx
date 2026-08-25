@@ -139,36 +139,44 @@ export function DashboardPage(): JSX.Element {
             value={format.money(data?.sales ?? 0)}
             footnote={`${format.pluralize(data?.billCount ?? 0, 'bill')} · average ${format.money(data?.averageBill ?? 0)}`}
           />
-          <StatTile
-            label="Profit"
-            unit={currency}
-            value={format.money(data?.profit ?? 0)}
-            tone={(data?.profit ?? 0) < 0 ? 'bad' : 'good'}
-            footnote="Before expenses"
-          />
-          <StatTile
-            label="Expenses"
-            unit={currency}
-            value={format.money(data?.expenses ?? 0)}
-            tone={(data?.expenses ?? 0) > 0 ? 'bad' : 'default'}
-          />
-          <StatTile
-            label="Cash in hand"
-            unit={currency}
-            value={format.money(data?.cashInHand ?? 0)}
-            footnote="All time, after expenses and payments"
-          />
+          {isAdmin && (
+            <StatTile
+              label="Profit"
+              unit={currency}
+              value={format.money(data?.profit ?? 0)}
+              tone={(data?.profit ?? 0) < 0 ? 'bad' : 'good'}
+              footnote="Before expenses"
+            />
+          )}
+          {isAdmin && (
+            <StatTile
+              label="Expenses"
+              unit={currency}
+              value={format.money(data?.expenses ?? 0)}
+              tone={(data?.expenses ?? 0) > 0 ? 'bad' : 'default'}
+            />
+          )}
+          {isAdmin && (
+            <StatTile
+              label="Cash in hand"
+              unit={currency}
+              value={format.money(data?.cashInHand ?? 0)}
+              footnote="All time, after expenses and payments"
+            />
+          )}
           <StatTile
             label="Customers owe you"
             unit={currency}
             value={format.money(data?.receivables ?? 0)}
             tone={(data?.receivables ?? 0) > 0 ? 'bad' : 'default'}
           />
-          <StatTile
-            label="You owe suppliers"
-            unit={currency}
-            value={format.money(data?.payables ?? 0)}
-          />
+          {isAdmin && (
+            <StatTile
+              label="You owe suppliers"
+              unit={currency}
+              value={format.money(data?.payables ?? 0)}
+            />
+          )}
         </StatGrid>
 
         <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start gap-5">
@@ -179,7 +187,7 @@ export function DashboardPage(): JSX.Element {
                 subtitle={`${format.date(range.from)} to ${format.date(range.to)}`}
               />
               <CardBody>
-                <SalesTrendChart points={data?.trend ?? []} height={240} />
+                <SalesTrendChart points={data?.trend ?? []} height={240} showProfit={isAdmin} />
               </CardBody>
             </Card>
 
@@ -219,26 +227,30 @@ export function DashboardPage(): JSX.Element {
           </div>
 
           <div className="flex flex-col gap-5">
-            <Card>
-              <CardHeader
-                title="Sales composition"
-                subtitle="Cost of goods vs profit this period"
-              />
-              <CardBody>
-                <GrossMarginChart sales={data?.sales ?? 0} profit={data?.profit ?? 0} />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader title="Financial position" subtitle="Where your money stands today" />
-              <CardBody>
-                <FinancialPositionChart
-                  cashInHand={data?.cashInHand ?? 0}
-                  receivables={data?.receivables ?? 0}
-                  payables={data?.payables ?? 0}
+            {isAdmin && (
+              <Card>
+                <CardHeader
+                  title="Sales composition"
+                  subtitle="Cost of goods vs profit this period"
                 />
-              </CardBody>
-            </Card>
+                <CardBody>
+                  <GrossMarginChart sales={data?.sales ?? 0} profit={data?.profit ?? 0} />
+                </CardBody>
+              </Card>
+            )}
+
+            {isAdmin && (
+              <Card>
+                <CardHeader title="Financial position" subtitle="Where your money stands today" />
+                <CardBody>
+                  <FinancialPositionChart
+                    cashInHand={data?.cashInHand ?? 0}
+                    receivables={data?.receivables ?? 0}
+                    payables={data?.payables ?? 0}
+                  />
+                </CardBody>
+              </Card>
+            )}
 
             <Card>
               <CardHeader
@@ -269,12 +281,14 @@ export function DashboardPage(): JSX.Element {
               </CardBody>
             </Card>
 
-            <Card>
-              <CardHeader title="Top products" subtitle="By sales in this period" />
-              <CardBody>
-                <TopProductsChart rows={data?.topProducts ?? []} />
-              </CardBody>
-            </Card>
+            {isAdmin && (
+              <Card>
+                <CardHeader title="Top products" subtitle="By sales in this period" />
+                <CardBody>
+                  <TopProductsChart rows={data?.topProducts ?? []} />
+                </CardBody>
+              </Card>
+            )}
 
             {isAdmin && <SetupChecklist settings={settings} info={info.data ?? null} />}
           </div>
