@@ -17,12 +17,17 @@ export interface CsvColumn<Row> {
 const BOM = '﻿'
 const NEWLINE = '\r\n'
 const FORMULA_START = /^[=+\-@\t\r]/
+// A plain (optionally negative) decimal number is never a formula-injection
+// vector, so it must not be quote-prefixed — otherwise "-1234.00" lands in
+// Excel as left-aligned text that won't sum. Anything with a non-numeric
+// character (=, +, @, a cell reference, a function call) still gets escaped.
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/
 
 function escapeCell(raw: string | number | null | undefined): string {
   if (raw === null || raw === undefined) return ''
 
   let value = String(raw)
-  if (FORMULA_START.test(value)) value = `'${value}`
+  if (FORMULA_START.test(value) && !PLAIN_NUMBER.test(value)) value = `'${value}`
 
   if (/[",\r\n]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`

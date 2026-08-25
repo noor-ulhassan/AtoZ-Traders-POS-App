@@ -64,4 +64,11 @@ describe('amount in words', () => {
     expect(amountInWords(0)).toBe('Rupees Zero Only')
     expect(amountInWords(-500)).toBe('Minus Rupees Five Hundred Only')
   })
+
+  it('carries a fraction that rounds up to a full rupee', () => {
+    // 0.999 * 100 rounds to 100 paisa; it must fold into the rupees rather
+    // than read "... and One Hundred Paisa".
+    expect(amountInWords(1250.999)).toBe('Rupees One Thousand Two Hundred Fifty One Only')
+    expect(amountInWords(0.999)).toBe('Rupees One Only')
+  })
 })
