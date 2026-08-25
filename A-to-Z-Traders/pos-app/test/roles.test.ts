@@ -3,6 +3,7 @@ import { createTestDb } from './helpers/database'
 import * as authService from '../src/main/services/authService'
 import * as userService from '../src/main/services/userService'
 import * as dashboardService from '../src/main/services/dashboardService'
+import * as reportService from '../src/main/services/reportService'
 import * as expenseService from '../src/main/services/expenseService'
 import * as productService from '../src/main/services/productService'
 import * as purchaseService from '../src/main/services/purchaseService'
@@ -207,5 +208,20 @@ describe('dashboard redaction', () => {
     expect(summary.sales).toBeGreaterThan(0)
     expect(summary.receivables).toBeGreaterThan(0)
     expect(summary.recentSales.length).toBeGreaterThan(0)
+  })
+
+  it('strips profit from the Sales-page summary for a shopkeeper but keeps sales', () => {
+    unlock('admin')
+    const asAdmin = reportService.salesSummary(range)
+    expect(asAdmin.totalProfit).toBeGreaterThan(0)
+    expect(asAdmin.topProducts.length).toBeGreaterThan(0)
+
+    unlock('shopkeeper', 'ali')
+    const asStaff = reportService.salesSummary(range)
+    expect(asStaff.totalSales).toBe(asAdmin.totalSales)
+    expect(asStaff.billCount).toBe(asAdmin.billCount)
+    expect(asStaff.totalProfit).toBe(0)
+    expect(asStaff.topProducts).toEqual([])
+    expect(asStaff.daily.every((point) => point.profit === 0)).toBe(true)
   })
 })

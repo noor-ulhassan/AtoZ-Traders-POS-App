@@ -13,6 +13,7 @@ import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
+import { useAuth } from '../../app/AuthContext'
 import { useCurrency } from '../../app/SettingsContext'
 import { PaymentModal } from './PaymentModal'
 
@@ -29,6 +30,7 @@ interface LedgerPageProps {
  */
 export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
   const currency = useCurrency()
+  const isAdmin = useAuth().role === 'admin'
   const { id } = useParams<{ id: string }>()
   const partyId = Number(id)
 
@@ -113,13 +115,15 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
         }
         actions={
           <>
-            <Button
-              icon="download"
-              loading={exportCsv.isPending}
-              onClick={() => void exportCsv.run()}
-            >
-              Export
-            </Button>
+            {isAdmin && (
+              <Button
+                icon="download"
+                loading={exportCsv.isPending}
+                onClick={() => void exportCsv.run()}
+              >
+                Export
+              </Button>
+            )}
             <Button variant="primary" icon="payments" onClick={() => setIsPaymentOpen(true)}>
               {partyType === 'customer' ? 'Receive payment' : 'Pay supplier'}
             </Button>

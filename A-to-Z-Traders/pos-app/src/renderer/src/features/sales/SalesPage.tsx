@@ -176,12 +176,14 @@ export function SalesPage(): JSX.Element {
             unit={currency}
             value={format.money(summary.data?.totalSales ?? 0)}
           />
-          <StatTile
-            label="Profit"
-            unit={currency}
-            value={format.money(summary.data?.totalProfit ?? 0)}
-            tone={(summary.data?.totalProfit ?? 0) < 0 ? 'bad' : 'good'}
-          />
+          {isAdmin && (
+            <StatTile
+              label="Profit"
+              unit={currency}
+              value={format.money(summary.data?.totalProfit ?? 0)}
+              tone={(summary.data?.totalProfit ?? 0) < 0 ? 'bad' : 'good'}
+            />
+          )}
           <StatTile label="Bills" value={summary.data?.billCount ?? 0} />
           <StatTile
             label="Average bill"
