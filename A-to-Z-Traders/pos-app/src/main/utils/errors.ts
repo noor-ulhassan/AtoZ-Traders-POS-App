@@ -62,6 +62,9 @@ export function translateSqliteError(error: unknown): AppError | null {
     if (error.message.includes('product_units')) {
       return conflict('That unit is already defined for this product.')
     }
+    if (error.message.includes('staff_users.username')) {
+      return conflict('That username is already taken.')
+    }
     return conflict('This record conflicts with one that already exists.')
   }
 

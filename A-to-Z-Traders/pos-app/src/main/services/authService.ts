@@ -4,12 +4,22 @@ import type {
   AuthResetInput,
   AuthSetupInput,
   AuthStatus,
-  SecurityQuestion
+  SecurityQuestion,
+  StaffLoginInput
 } from '@shared/types'
 import { getDb } from '../db/connection'
 import * as repo from '../repositories/authRepository'
 import type { AdminCredentialRow } from '../repositories/authRepository'
-import { isUnlocked, lock as lockSession, unlock as unlockSession } from '../auth/session'
+import * as userRepo from '../repositories/userRepository'
+import type { StaffUserRow } from '../repositories/userRepository'
+import {
+  currentRole,
+  currentUsername,
+  isUnlocked,
+  lock as lockSession,
+  unlock as unlockSession
+} from '../auth/session'
+import { toBool } from '../db/rows'
 import { hashSecret, normalizeAnswer, verifySecret } from '../utils/password'
 import { AppError } from '../utils/errors'
 
@@ -35,22 +45,39 @@ function activeLock(db: import('../db/connection').Db, row: AdminCredentialRow):
   return row.locked_until > repo.now(db) ? row.locked_until : null
 }
 
+/** As `activeLock`, for a staff row against the staff-table clock. */
+function activeStaffLock(db: import('../db/connection').Db, row: StaffUserRow): string | null {
+  if (!row.locked_until) return null
+  return row.locked_until > userRepo.now(db) ? row.locked_until : null
+}
+
 /** '2026-08-13 14:32:00' -> '14:32', for a human-friendly "try again after". */
 const clockOf = (timestamp: string): string => timestamp.slice(11, 16)
+
+/** Session fields shared by every status: who (if anyone) is signed in. */
+function sessionFields(): Pick<AuthStatus, 'unlocked' | 'role' | 'username'> {
+  const role = currentRole()
+  const username = currentUsername()
+  return {
+    unlocked: isUnlocked(),
+    ...(role ? { role } : {}),
+    ...(username ? { username } : {})
+  }
+}
 
 export function getStatus(): AuthStatus {
   const db = getDb()
   const row = repo.getCredential(db)
   if (!row) {
-    return { configured: false, unlocked: isUnlocked(), locked: false }
+    return { configured: false, locked: false, ...sessionFields() }
   }
   const lockedUntil = activeLock(db, row)
   return {
     configured: true,
-    unlocked: isUnlocked(),
     locked: lockedUntil !== null,
     ...(lockedUntil ? { lockedUntil } : {}),
-    securityQuestion: row.security_question
+    securityQuestion: row.security_question,
+    ...sessionFields()
   }
 }
 
@@ -69,7 +96,7 @@ export function setup(input: AuthSetupInput): AuthStatus {
     securityAnswerHash: answer.hash,
     securityAnswerSalt: answer.salt
   })
-  unlockSession()
+  unlockSession('admin')
   return getStatus()
 }
 
@@ -85,7 +112,7 @@ export function login(input: AuthLoginInput): AuthStatus {
 
   if (verifySecret(input.password, row.password_salt, row.password_hash)) {
     repo.clearLockout(db)
-    unlockSession()
+    unlockSession('admin')
     return getStatus()
   }
 
@@ -164,6 +191,51 @@ export function resetPassword(input: AuthResetInput): AuthStatus {
 
   const password = hashSecret(input.newPassword)
   repo.updatePassword(db, password.hash, password.salt) // also clears the lockout
-  unlockSession()
+  unlockSession('admin')
   return getStatus()
+}
+
+/**
+ * Staff sign-in with a username and 4-digit PIN.
+ *
+ * Mirrors the admin login's throttling — a 4-digit PIN is a small guessing
+ * space, so five wrong tries locks that one account for 15 minutes without
+ * touching anyone else's. A wrong username and a wrong PIN fail identically so
+ * a probe learns nothing about which usernames exist.
+ */
+export function staffLogin(input: StaffLoginInput): AuthStatus {
+  const db = getDb()
+  const wrong = (): never =>
+    authFail('Incorrect username or PIN.', { pin: 'Incorrect username or PIN.' })
+
+  const row = userRepo.findByUsername(db, input.username)
+  if (!row) return wrong()
+  if (!toBool(row.is_active)) {
+    throw authError('This account has been turned off. Ask the shop owner.')
+  }
+
+  const locked = activeStaffLock(db, row)
+  if (locked) {
+    throw authError(`Too many attempts. Try again after ${clockOf(locked)}.`)
+  }
+
+  if (verifySecret(input.pin, row.pin_salt, row.pin_hash)) {
+    userRepo.recordSuccessfulLogin(db, row.id)
+    unlockSession('shopkeeper', row.username)
+    return getStatus()
+  }
+
+  const attempts = row.failed_attempts + 1
+  if (attempts >= MAX_ATTEMPTS) {
+    const until = userRepo.lockTimestamp(db, LOCK_MINUTES)
+    userRepo.recordFailedAttempt(db, row.id, attempts, until)
+    throw authError(`Too many attempts. This account is locked until ${clockOf(until)}.`)
+  }
+  userRepo.recordFailedAttempt(db, row.id, attempts, null)
+  return wrong()
+}
+
+/** Throws the uniform auth failure; typed `never` so callers can `return` it. */
+function authFail(message: string, fields?: Record<string, string>): never {
+  throw authError(message, fields)
 }

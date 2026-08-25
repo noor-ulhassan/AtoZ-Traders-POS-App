@@ -18,6 +18,7 @@ import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
+import { useAuth } from '../../app/AuthContext'
 import { useSettings } from '../../app/SettingsContext'
 import { SetupChecklist } from './SetupChecklist'
 
@@ -32,11 +33,19 @@ export function DashboardPage(): JSX.Element {
   const { settings } = useSettings()
   const currency = settings.currency
   const navigate = useNavigate()
+  // The setup checklist and the report/product links are the owner's; a
+  // shopkeeper sees the day's trade but not the way through to owner screens.
+  const isAdmin = useAuth().role === 'admin'
 
   const [range, setRange] = useState<DateRange>(() => resolvePreset('today'))
 
   const summary = useQuery(() => unwrap(api.dashboard.summary(range)), [range.from, range.to])
-  const info = useQuery(() => unwrap(api.backup.info()), [])
+  // backup:info is an owner-only channel, and the checklist it feeds is too, so
+  // a shopkeeper never asks for it.
+  const info = useQuery(
+    () => (isAdmin ? unwrap(api.backup.info()) : Promise.resolve(null)),
+    [isAdmin]
+  )
   const data = summary.data
 
   const recentColumns: Column<RecentSaleRow>[] = [
@@ -105,9 +114,11 @@ export function DashboardPage(): JSX.Element {
         subtitle={settings.businessName || 'Your shop at a glance'}
         actions={
           <>
-            <Button icon="reports" onClick={() => navigate('/reports')}>
-              Full reports
-            </Button>
+            {isAdmin && (
+              <Button icon="reports" onClick={() => navigate('/reports')}>
+                Full reports
+              </Button>
+            )}
             <Button variant="primary" icon="bill" onClick={() => navigate('/billing')}>
               New bill
             </Button>
@@ -233,9 +244,11 @@ export function DashboardPage(): JSX.Element {
               <CardHeader
                 title="Needs reordering"
                 actions={
-                  <Button size="sm" onClick={() => navigate('/reports')}>
-                    Full list
-                  </Button>
+                  isAdmin ? (
+                    <Button size="sm" onClick={() => navigate('/reports')}>
+                      Full list
+                    </Button>
+                  ) : undefined
                 }
               />
               <CardBody flush>
@@ -247,7 +260,7 @@ export function DashboardPage(): JSX.Element {
                   isLoading={summary.isLoading}
                   error={summary.error}
                   onRetry={summary.refetch}
-                  onRowClick={() => navigate('/products')}
+                  onRowClick={isAdmin ? () => navigate('/products') : undefined}
                   empty={{
                     title: 'Stock levels are fine',
                     description: 'Nothing is at or below its reorder level.'
@@ -263,7 +276,7 @@ export function DashboardPage(): JSX.Element {
               </CardBody>
             </Card>
 
-            <SetupChecklist settings={settings} info={info.data} />
+            {isAdmin && <SetupChecklist settings={settings} info={info.data ?? null} />}
           </div>
         </div>
       </PageBody>

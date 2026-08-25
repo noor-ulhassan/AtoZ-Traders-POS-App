@@ -57,6 +57,11 @@ import type {
   SellableUnit,
   Settings,
   SettingsUpdate,
+  StaffCreateInput,
+  StaffLoginInput,
+  StaffResetPinInput,
+  StaffSetActiveInput,
+  StaffUser,
   StockAdjustmentInput,
   StockMovement,
   StockMovementFilters,
@@ -76,10 +81,16 @@ export const IPC_CHANNELS = {
   authStatus: 'auth:status',
   authSetup: 'auth:setup',
   authLogin: 'auth:login',
+  authStaffLogin: 'auth:staffLogin',
   authLock: 'auth:lock',
   authChangePassword: 'auth:changePassword',
   authSecurityQuestion: 'auth:securityQuestion',
   authResetPassword: 'auth:resetPassword',
+
+  usersList: 'users:list',
+  usersCreate: 'users:create',
+  usersSetActive: 'users:setActive',
+  usersResetPin: 'users:resetPin',
 
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
@@ -171,10 +182,19 @@ export interface PosApi {
     status(): Result<AuthStatus>
     setup(input: AuthSetupInput): Result<AuthStatus>
     login(input: AuthLoginInput): Result<AuthStatus>
+    staffLogin(input: StaffLoginInput): Result<AuthStatus>
     lock(): Result<AuthStatus>
     changePassword(input: AuthChangePasswordInput): Result<AuthStatus>
     securityQuestion(): Result<SecurityQuestion>
     resetPassword(input: AuthResetInput): Result<AuthStatus>
+  }
+
+  /** Staff account management. Admin-only at the IPC boundary. */
+  users: {
+    list(): Result<StaffUser[]>
+    create(input: StaffCreateInput): Result<StaffUser>
+    setActive(input: StaffSetActiveInput): Result<StaffUser>
+    resetPin(input: StaffResetPinInput): Result<StaffUser>
   }
 
   settings: {

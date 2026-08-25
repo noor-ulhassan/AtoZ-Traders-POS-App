@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { IpcChannel } from '@shared/ipc'
 import { IPC_CHANNELS } from '@shared/ipc'
 import type { IpcResult } from '@shared/types'
-import { isUnlocked } from '../auth/session'
+import { currentRole, isUnlocked } from '../auth/session'
 import { isBusy } from './maintenance'
 import { AppError, translateSqliteError } from '../utils/errors'
 import { logger } from '../utils/logger'
@@ -11,6 +11,82 @@ import { logger } from '../utils/logger'
 const log = logger.child('ipc')
 
 const registered = new Set<string>()
+
+/**
+ * What a shopkeeper may do — the authoritative access policy, enforced in the
+ * main process so the lock is real even against a scripted renderer (Guide
+ * §1.3). It is a strict allowlist: the admin has full access exactly as before
+ * roles existed, and a shopkeeper is granted ONLY the channels named here.
+ * Anything absent is denied — fail closed, so a new sensitive channel is
+ * owner-only until someone deliberately opens it.
+ *
+ * `true` allows the channel outright; a predicate further restricts the
+ * (already validated) payload — e.g. a shopkeeper records customer receipts,
+ * never supplier payouts.
+ */
+type PayloadRule = true | ((input: unknown) => boolean)
+
+const isCustomerReceipt = (input: unknown): boolean =>
+  (input as { input?: { partyType?: string } })?.input?.partyType === 'customer'
+
+const SHOPKEEPER_CHANNELS: Partial<Record<IpcChannel, PayloadRule>> = {
+  // Read settings so the billing screen knows the currency and tax rate.
+  [IPC_CHANNELS.settingsGet]: true,
+
+  // Find products to put on a bill.
+  [IPC_CHANNELS.categoriesList]: true,
+  [IPC_CHANNELS.productsList]: true,
+  [IPC_CHANNELS.productsGet]: true,
+  [IPC_CHANNELS.productsSellableUnits]: true,
+  [IPC_CHANNELS.productsUnitsList]: true,
+
+  // Find, view and add customers (editing an existing one stays with the admin).
+  [IPC_CHANNELS.customersList]: true,
+  [IPC_CHANNELS.customersGet]: true,
+  [IPC_CHANNELS.customersLedger]: true,
+  [IPC_CHANNELS.customersAdd]: true,
+
+  // Bill, and reprint what was billed.
+  [IPC_CHANNELS.salesList]: true,
+  [IPC_CHANNELS.salesGet]: true,
+  [IPC_CHANNELS.salesCreate]: true,
+  [IPC_CHANNELS.salesNextInvoiceNo]: true,
+  [IPC_CHANNELS.salesSuggestPrice]: true,
+  [IPC_CHANNELS.salesReceipt]: true,
+  [IPC_CHANNELS.printReceipt]: true,
+
+  // Take goods back from a customer.
+  [IPC_CHANNELS.saleReturnsList]: true,
+  [IPC_CHANNELS.saleReturnsGet]: true,
+  [IPC_CHANNELS.saleReturnsCreate]: true,
+
+  // Receive money against a customer's khata — customer receipts only.
+  [IPC_CHANNELS.paymentsCreate]: isCustomerReceipt,
+  [IPC_CHANNELS.paymentsList]: true,
+
+  // The day's-trade views: the dashboard, and the sales-list summary tiles.
+  // (The owner-only P&L, valuation and product-profit reports are NOT here.)
+  [IPC_CHANNELS.dashboardSummary]: true,
+  [IPC_CHANNELS.reportsSalesSummary]: true,
+
+  // Innocuous plumbing every screen may need.
+  [IPC_CHANNELS.systemLogError]: true
+}
+
+/** The refusal a shopkeeper gets for an owner-only channel. */
+const FORBIDDEN_RESULT: IpcResult<never> = {
+  ok: false,
+  error: { code: 'AUTH', message: 'Your account does not have access to that.' }
+}
+
+/** Decides whether the signed-in role may run `channel` with this payload.
+ *  Exported for direct testing of the access policy. */
+export function isAuthorized(channel: IpcChannel, input: unknown): boolean {
+  if (currentRole() === 'admin') return true
+  const rule = SHOPKEEPER_CHANNELS[channel]
+  if (rule === true) return true
+  return typeof rule === 'function' && rule(input)
+}
 
 function validationError(error: z.ZodError): AppError {
   const fields: Record<string, string> = {}
@@ -111,6 +187,14 @@ export function registerHandler<Schema extends z.ZodTypeAny, Output>(
       const error = validationError(parsed.error)
       log.warn(`${channel} invalid input`, error.fields)
       return { ok: false, error: error.toIpcError() }
+    }
+
+    // Role check runs on the validated payload so a payload rule (e.g. "customer
+    // receipts only") sees clean data. Public channels are exempt — they are how
+    // a session is established in the first place.
+    if (!options.public && !isAuthorized(channel, parsed.data)) {
+      log.warn(`${channel} blocked: role ${currentRole()} not permitted`)
+      return FORBIDDEN_RESULT
     }
 
     try {
