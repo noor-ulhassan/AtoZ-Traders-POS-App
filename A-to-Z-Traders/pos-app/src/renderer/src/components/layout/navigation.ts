@@ -1,9 +1,12 @@
 import type { IconName } from '../icons/Icon'
+import type { Feature } from '../../app/permissions'
 
 export interface NavItem {
   to: string
   label: string
   icon: IconName
+  /** The access feature this item belongs to, used to hide it per role. */
+  feature: Feature
   /** Keyboard shortcut shown beside the item and bound in the shell. */
   hotkey?: string
 }
@@ -25,40 +28,46 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: 'Sell',
     items: [
-      { to: '/', label: 'Dashboard', icon: 'dashboard' },
-      { to: '/billing', label: 'New bill', icon: 'bill', hotkey: 'F2' },
-      { to: '/sales', label: 'Sales', icon: 'sales' },
-      { to: '/returns/sale', label: 'Sale returns', icon: 'returns' }
+      { to: '/', label: 'Dashboard', icon: 'dashboard', feature: 'dashboard' },
+      { to: '/billing', label: 'New bill', icon: 'bill', feature: 'billing', hotkey: 'F2' },
+      { to: '/sales', label: 'Sales', icon: 'sales', feature: 'sales' },
+      { to: '/returns/sale', label: 'Sale returns', icon: 'returns', feature: 'saleReturns' }
     ]
   },
   {
     label: 'Stock',
     items: [
-      { to: '/products', label: 'Products', icon: 'products' },
-      { to: '/purchases', label: 'Purchases', icon: 'purchases' },
-      { to: '/returns/purchase', label: 'Purchase returns', icon: 'returns' },
-      { to: '/stock', label: 'Stock ledger', icon: 'stock' }
+      { to: '/products', label: 'Products', icon: 'products', feature: 'products' },
+      { to: '/purchases', label: 'Purchases', icon: 'purchases', feature: 'purchases' },
+      {
+        to: '/returns/purchase',
+        label: 'Purchase returns',
+        icon: 'returns',
+        feature: 'purchaseReturns'
+      },
+      { to: '/stock', label: 'Stock ledger', icon: 'stock', feature: 'stock' }
     ]
   },
   {
     label: 'People',
     items: [
-      { to: '/customers', label: 'Customers', icon: 'customers' },
-      { to: '/suppliers', label: 'Suppliers', icon: 'suppliers' }
+      { to: '/customers', label: 'Customers', icon: 'customers', feature: 'customers' },
+      { to: '/suppliers', label: 'Suppliers', icon: 'suppliers', feature: 'suppliers' }
     ]
   },
   {
     label: 'Money',
     items: [
-      { to: '/payments', label: 'Payments', icon: 'payments' },
-      { to: '/expenses', label: 'Expenses', icon: 'expenses' }
+      { to: '/payments', label: 'Payments', icon: 'payments', feature: 'payments' },
+      { to: '/expenses', label: 'Expenses', icon: 'expenses', feature: 'expenses' }
     ]
   },
   {
     label: 'Business',
     items: [
-      { to: '/reports', label: 'Reports', icon: 'reports' },
-      { to: '/settings', label: 'Settings', icon: 'settings' }
+      { to: '/reports', label: 'Reports', icon: 'reports', feature: 'reports' },
+      { to: '/users', label: 'Staff & roles', icon: 'lock', feature: 'users' },
+      { to: '/settings', label: 'Settings', icon: 'settings', feature: 'settings' }
     ]
   }
 ]

@@ -1,5 +1,6 @@
 import type { DashboardSummary, DateRange, RecentSaleRow } from '@shared/types'
 import { money } from '@shared/money'
+import { currentRole } from '../auth/session'
 import { getDb } from '../db/connection'
 import { totalOutstanding } from '../repositories/partyRepository'
 import { lowStock, productProfit, salesSummary } from './reportService'
@@ -75,7 +76,7 @@ export function getSummary(range: DateRange): DashboardSummary {
   const db = getDb()
   const summary = salesSummary(range)
 
-  return {
+  const full: DashboardSummary = {
     range,
     sales: summary.totalSales,
     profit: summary.totalProfit,
@@ -89,6 +90,30 @@ export function getSummary(range: DateRange): DashboardSummary {
     topProducts: summary.topProducts.slice(0, 5),
     lowStock: lowStock().slice(0, 8),
     recentSales: recentSales()
+  }
+
+  return currentRole() === 'shopkeeper' ? redactForShopkeeper(full) : full
+}
+
+/**
+ * A shopkeeper sees the shop's *activity*, not its *profitability*.
+ *
+ * The owner's financial figures — profit, product margins, the cost side of
+ * sales, expenses, the cash position and what the shop owes — are stripped here,
+ * before the summary crosses to the renderer. That keeps them out of the IPC
+ * payload itself, not merely hidden on screen: a shopkeeper cannot read them
+ * from devtools either. Sales volume, bill counts, what customers owe, low
+ * stock and recent bills stay — that is what counter work needs.
+ */
+function redactForShopkeeper(full: DashboardSummary): DashboardSummary {
+  return {
+    ...full,
+    profit: 0,
+    expenses: 0,
+    cashInHand: 0,
+    payables: 0,
+    topProducts: [],
+    trend: full.trend.map((point) => ({ ...point, profit: 0 }))
   }
 }
 

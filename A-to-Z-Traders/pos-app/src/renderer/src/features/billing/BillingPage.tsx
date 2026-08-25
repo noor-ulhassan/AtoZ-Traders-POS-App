@@ -111,7 +111,11 @@ export function BillingPage(): JSX.Element {
         api.sales.create({
           customerId: bill.customer?.id ?? null,
           date,
-          discount: bill.discount,
+          // Send the capped discount the totals panel is showing — not the raw
+          // keyed figure. A discount typed larger than the subtotal is displayed
+          // (and saved) as the subtotal; sending the raw value instead made the
+          // server reject a bill whose on-screen total looked perfectly valid.
+          discount: totals.discount,
           paymentType,
           paidAmount: paidNow,
           notes: bill.notes || null,

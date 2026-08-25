@@ -80,8 +80,14 @@ function wholeNumberInWords(value: number): string {
 export function amountInWords(amount: number, currency = 'PKR'): string {
   const negative = amount < 0
   const absolute = Math.abs(amount)
-  const rupees = Math.floor(absolute)
-  const paisa = Math.round((absolute - rupees) * 100)
+  let rupees = Math.floor(absolute)
+  let paisa = Math.round((absolute - rupees) * 100)
+  // Rounding the fraction can carry to a full rupee (e.g. 1250.999 → 100 paisa);
+  // fold it in so the words never read "... and One Hundred Paisa".
+  if (paisa >= 100) {
+    rupees += Math.floor(paisa / 100)
+    paisa %= 100
+  }
 
   const unit = currency.toUpperCase() === 'PKR' ? 'Rupees' : currency
   const fraction = currency.toUpperCase() === 'PKR' ? 'Paisa' : 'Cents'

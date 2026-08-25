@@ -5,7 +5,8 @@ import {
   authChangePasswordSchema,
   authLoginSchema,
   authResetSchema,
-  authSetupSchema
+  authSetupSchema,
+  staffLoginSchema
 } from '../schemas/auth'
 
 /**
@@ -30,6 +31,13 @@ export function registerAuthHandlers(): void {
     IPC_CHANNELS.authLogin,
     authLoginSchema,
     (input) => authService.login(input),
+    publicChannel
+  )
+
+  registerHandler(
+    IPC_CHANNELS.authStaffLogin,
+    staffLoginSchema,
+    (input) => authService.staffLogin(input),
     publicChannel
   )
 

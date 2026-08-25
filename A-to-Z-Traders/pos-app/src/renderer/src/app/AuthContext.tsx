@@ -4,16 +4,20 @@ import type {
   AuthChangePasswordInput,
   AuthResetInput,
   AuthSetupInput,
-  AuthStatus
+  AuthStatus,
+  UserRole
 } from '@shared/types'
 import { api, errorMessage, unwrap } from '../lib/api'
 
 interface AuthContextValue {
   status: AuthStatus
+  /** The signed-in role, or null when locked. Convenience over `status.role`. */
+  role: UserRole | null
   /** Re-read the gate state from the main process. */
   refresh: () => Promise<void>
   setup: (input: AuthSetupInput) => Promise<void>
   login: (password: string) => Promise<void>
+  staffLogin: (username: string, pin: string) => Promise<void>
   lock: () => Promise<void>
   changePassword: (input: AuthChangePasswordInput) => Promise<void>
   resetPassword: (input: AuthResetInput) => Promise<void>
@@ -61,6 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     setStatus(await unwrap(api.auth.login({ password })))
   }, [])
 
+  const staffLogin = useCallback(async (username: string, pin: string) => {
+    setStatus(await unwrap(api.auth.staffLogin({ username, pin })))
+  }, [])
+
   const lock = useCallback(async () => {
     setStatus(await unwrap(api.auth.lock()))
   }, [])
@@ -74,8 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   }, [])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, refresh, setup, login, lock, changePassword, resetPassword }),
-    [status, refresh, setup, login, lock, changePassword, resetPassword]
+    () => ({
+      status,
+      role: status.role ?? null,
+      refresh,
+      setup,
+      login,
+      staffLogin,
+      lock,
+      changePassword,
+      resetPassword
+    }),
+    [status, refresh, setup, login, staffLogin, lock, changePassword, resetPassword]
   )
 
   // A local IPC read; the wait is a frame. Rendering the gate before the answer

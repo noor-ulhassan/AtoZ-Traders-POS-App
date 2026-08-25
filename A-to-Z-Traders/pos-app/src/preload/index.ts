@@ -33,10 +33,18 @@ const api = {
     status: () => invoke(IPC_CHANNELS.authStatus),
     setup: (input) => invoke(IPC_CHANNELS.authSetup, input),
     login: (input) => invoke(IPC_CHANNELS.authLogin, input),
+    staffLogin: (input) => invoke(IPC_CHANNELS.authStaffLogin, input),
     lock: () => invoke(IPC_CHANNELS.authLock),
     changePassword: (input) => invoke(IPC_CHANNELS.authChangePassword, input),
     securityQuestion: () => invoke(IPC_CHANNELS.authSecurityQuestion),
     resetPassword: (input) => invoke(IPC_CHANNELS.authResetPassword, input)
+  },
+
+  users: {
+    list: () => invoke(IPC_CHANNELS.usersList),
+    create: (input) => invoke(IPC_CHANNELS.usersCreate, input),
+    setActive: (input) => invoke(IPC_CHANNELS.usersSetActive, input),
+    resetPin: (input) => invoke(IPC_CHANNELS.usersResetPin, input)
   },
 
   settings: {

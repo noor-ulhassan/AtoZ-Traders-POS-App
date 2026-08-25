@@ -16,6 +16,7 @@ import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
+import { useAuth } from '../../app/AuthContext'
 import { useCurrency } from '../../app/SettingsContext'
 import { SaleDetailModal } from './SaleDetailModal'
 
@@ -28,6 +29,7 @@ const PAYMENT_BADGE: Record<PaymentType, { label: string; tone: 'good' | 'warn' 
 export function SalesPage(): JSX.Element {
   const currency = useCurrency()
   const navigate = useNavigate()
+  const isAdmin = useAuth().role === 'admin'
 
   const [range, setRange] = useState<DateRange>(() => resolvePreset('today'))
   const [search, setSearch] = useState('')
@@ -125,16 +127,20 @@ export function SalesPage(): JSX.Element {
         subtitle="Every bill, with what was paid and what is still owed"
         actions={
           <>
-            <Button
-              icon="download"
-              loading={exportCsv.isPending}
-              onClick={() => void exportCsv.run('sales')}
-            >
-              Export bills
-            </Button>
-            <Button icon="download" onClick={() => void exportCsv.run('sale-items')}>
-              Export items
-            </Button>
+            {isAdmin && (
+              <Button
+                icon="download"
+                loading={exportCsv.isPending}
+                onClick={() => void exportCsv.run('sales')}
+              >
+                Export bills
+              </Button>
+            )}
+            {isAdmin && (
+              <Button icon="download" onClick={() => void exportCsv.run('sale-items')}>
+                Export items
+              </Button>
+            )}
             <Button variant="primary" icon="bill" onClick={() => navigate('/billing')}>
               New bill
             </Button>
@@ -170,12 +176,14 @@ export function SalesPage(): JSX.Element {
             unit={currency}
             value={format.money(summary.data?.totalSales ?? 0)}
           />
-          <StatTile
-            label="Profit"
-            unit={currency}
-            value={format.money(summary.data?.totalProfit ?? 0)}
-            tone={(summary.data?.totalProfit ?? 0) < 0 ? 'bad' : 'good'}
-          />
+          {isAdmin && (
+            <StatTile
+              label="Profit"
+              unit={currency}
+              value={format.money(summary.data?.totalProfit ?? 0)}
+              tone={(summary.data?.totalProfit ?? 0) < 0 ? 'bad' : 'good'}
+            />
+          )}
           <StatTile label="Bills" value={summary.data?.billCount ?? 0} />
           <StatTile
             label="Average bill"

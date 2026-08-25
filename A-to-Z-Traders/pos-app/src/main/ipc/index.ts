@@ -1,5 +1,6 @@
 import { assertAllChannelsRegistered } from './registry'
 import { registerAuthHandlers } from './channels/auth.ipc'
+import { registerUserHandlers } from './channels/users.ipc'
 import { registerCatalogHandlers } from './channels/catalog.ipc'
 import { registerInsightsHandlers } from './channels/insights.ipc'
 import { registerMoneyHandlers } from './channels/money.ipc'
@@ -15,6 +16,7 @@ import { registerTradeHandlers } from './channels/trade.ipc'
  */
 export function registerIpcHandlers(): void {
   registerAuthHandlers()
+  registerUserHandlers()
   registerSettingsHandlers()
   registerCatalogHandlers()
   registerPartyHandlers()

@@ -15,6 +15,7 @@ import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
+import { useAuth } from '../../app/AuthContext'
 import { useCurrency } from '../../app/SettingsContext'
 import { PartyPickerModal } from './PartyPickerModal'
 import { PaymentModal } from '../parties/PaymentModal'
@@ -25,15 +26,28 @@ type Filter = PartyType | 'all'
 export function PaymentsPage(): JSX.Element {
   const currency = useCurrency()
   const confirm = useConfirm()
+  // A shopkeeper only handles customer receipts: no supplier payouts, no
+  // removing a recorded payment, no export. The main process enforces the same.
+  const isAdmin = useAuth().role === 'admin'
 
   const [range, setRange] = useState<DateRange>(() => resolvePreset('thisMonth'))
   const [partyType, setPartyType] = useState<Filter>('all')
   const [pickerFor, setPickerFor] = useState<PartyType | null>(null)
   const [payingParty, setPayingParty] = useState<{ party: Customer; type: PartyType } | null>(null)
 
+  const effectivePartyType: Filter = isAdmin ? partyType : 'customer'
+
   const payments = useQuery(
-    () => unwrap(api.payments.list({ from: range.from, to: range.to, partyType, limit: 500 })),
-    [range.from, range.to, partyType]
+    () =>
+      unwrap(
+        api.payments.list({
+          from: range.from,
+          to: range.to,
+          partyType: effectivePartyType,
+          limit: 500
+        })
+      ),
+    [range.from, range.to, effectivePartyType]
   )
 
   const exportCsv = useMutation(
@@ -109,23 +123,28 @@ export function PaymentsPage(): JSX.Element {
         </ToneValue>
       )
     },
-    {
-      key: 'actions',
-      header: '',
-      width: '60px',
-      render: (row) => (
-        <RowActions>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="trash"
-            aria-label="Remove payment"
-            title="Remove"
-            onClick={() => void askRemove(row)}
-          />
-        </RowActions>
-      )
-    }
+    // Reversing a payment is a correction only the owner may make.
+    ...(isAdmin
+      ? [
+          {
+            key: 'actions',
+            header: '',
+            width: '60px',
+            render: (row: Payment) => (
+              <RowActions>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash"
+                  aria-label="Remove payment"
+                  title="Remove"
+                  onClick={() => void askRemove(row)}
+                />
+              </RowActions>
+            )
+          }
+        ]
+      : [])
   ]
 
   return (
@@ -135,16 +154,20 @@ export function PaymentsPage(): JSX.Element {
         subtitle="Money received from customers and paid to suppliers"
         actions={
           <>
-            <Button
-              icon="download"
-              loading={exportCsv.isPending}
-              onClick={() => void exportCsv.run()}
-            >
-              Export
-            </Button>
-            <Button icon="plus" onClick={() => setPickerFor('supplier')}>
-              Pay supplier
-            </Button>
+            {isAdmin && (
+              <Button
+                icon="download"
+                loading={exportCsv.isPending}
+                onClick={() => void exportCsv.run()}
+              >
+                Export
+              </Button>
+            )}
+            {isAdmin && (
+              <Button icon="plus" onClick={() => setPickerFor('supplier')}>
+                Pay supplier
+              </Button>
+            )}
             <Button variant="primary" icon="plus" onClick={() => setPickerFor('customer')}>
               Receive payment
             </Button>
@@ -154,16 +177,18 @@ export function PaymentsPage(): JSX.Element {
 
       <FilterBar>
         <DateRangeFilter value={range} onChange={setRange} />
-        <div style={{ width: 170 }}>
-          <Select
-            value={partyType}
-            onChange={(event) => setPartyType(event.target.value as Filter)}
-          >
-            <option value="all">Everyone</option>
-            <option value="customer">Customers only</option>
-            <option value="supplier">Suppliers only</option>
-          </Select>
-        </div>
+        {isAdmin && (
+          <div style={{ width: 170 }}>
+            <Select
+              value={partyType}
+              onChange={(event) => setPartyType(event.target.value as Filter)}
+            >
+              <option value="all">Everyone</option>
+              <option value="customer">Customers only</option>
+              <option value="supplier">Suppliers only</option>
+            </Select>
+          </div>
+        )}
         <FilterSpacer />
       </FilterBar>
 

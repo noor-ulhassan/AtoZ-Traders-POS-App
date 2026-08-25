@@ -12,6 +12,7 @@ import type {
 } from '@shared/types'
 import { eachDay } from '@shared/date'
 import { money, qty } from '@shared/money'
+import { currentRole } from '../auth/session'
 import type { Db } from '../db/connection'
 import { getDb } from '../db/connection'
 
@@ -235,7 +236,7 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
   const totalProfit = money(daily.reduce((sum, point) => sum + point.profit, 0))
   const billCount = daily.reduce((sum, point) => sum + point.billCount, 0)
 
-  return {
+  const report: SalesSummaryReport = {
     range,
     totalSales,
     totalProfit,
@@ -244,6 +245,20 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
     daily,
     topProducts: productProfit(range, 10)
   }
+
+  // A shopkeeper may see sales volume but not profitability — the same line the
+  // dashboard draws. Strip profit and the profit-ranked product list here, at
+  // the source, so no profit figure reaches the renderer for the Sales page or
+  // the dashboard alike. (The other report functions are owner-only channels.)
+  if (currentRole() === 'shopkeeper') {
+    return {
+      ...report,
+      totalProfit: 0,
+      daily: report.daily.map((point) => ({ ...point, profit: 0 })),
+      topProducts: []
+    }
+  }
+  return report
 }
 
 export function stockValuation(): StockValuationReport {

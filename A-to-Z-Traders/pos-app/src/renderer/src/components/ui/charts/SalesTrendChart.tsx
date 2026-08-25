@@ -15,6 +15,8 @@ import { ChartTooltip, ChartTooltipRow } from './ChartTooltip'
 interface SalesTrendChartProps {
   points: SalesSummaryPoint[]
   height?: number
+  /** Whether the hover shows the profit row. Off for roles that may not see it. */
+  showProfit?: boolean
 }
 
 /**
@@ -27,7 +29,11 @@ interface SalesTrendChartProps {
  * Colours are CSS variables, so the whole chart follows the light/dark theme
  * with no JS.
  */
-export function SalesTrendChart({ points, height = 240 }: SalesTrendChartProps): JSX.Element {
+export function SalesTrendChart({
+  points,
+  height = 240,
+  showProfit = true
+}: SalesTrendChartProps): JSX.Element {
   if (points.length === 0) {
     return (
       <div className="flex items-center justify-center text-sm text-ink-subtle" style={{ height }}>
@@ -68,7 +74,7 @@ export function SalesTrendChart({ points, height = 240 }: SalesTrendChartProps):
           />
 
           <Tooltip
-            content={<TrendTooltip />}
+            content={<TrendTooltip showProfit={showProfit} />}
             cursor={{ stroke: 'var(--ink-subtle)', strokeDasharray: '3 3' }}
           />
 
@@ -91,19 +97,22 @@ export function SalesTrendChart({ points, height = 240 }: SalesTrendChartProps):
 interface TrendTooltipProps {
   active?: boolean
   payload?: { payload: SalesSummaryPoint }[]
+  showProfit?: boolean
 }
 
-function TrendTooltip({ active, payload }: TrendTooltipProps): JSX.Element | null {
+function TrendTooltip({ active, payload, showProfit = true }: TrendTooltipProps): JSX.Element | null {
   if (!active || !payload?.length) return null
   const point = payload[0].payload
   return (
     <ChartTooltip title={format.dayMonth(point.date)}>
       <ChartTooltipRow label="Sales" value={format.money(point.sales)} />
-      <ChartTooltipRow
-        label="Profit"
-        value={format.money(point.profit)}
-        tone={point.profit < 0 ? 'bad' : 'good'}
-      />
+      {showProfit && (
+        <ChartTooltipRow
+          label="Profit"
+          value={format.money(point.profit)}
+          tone={point.profit < 0 ? 'bad' : 'good'}
+        />
+      )}
       <ChartTooltipRow label="Bills" value={point.billCount} />
     </ChartTooltip>
   )

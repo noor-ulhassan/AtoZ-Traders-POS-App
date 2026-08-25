@@ -13,6 +13,7 @@ import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
+import { useAuth } from '../../app/AuthContext'
 import { useCurrency } from '../../app/SettingsContext'
 import { PartyFormModal } from './PartyFormModal'
 import { PaymentModal } from './PaymentModal'
@@ -56,6 +57,10 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
   const currency = useCurrency()
   const navigate = useNavigate()
   const copy = COPY[partyType]
+  // A shopkeeper can find, view and add customers, and take payments — but
+  // editing a record and exporting the list stay with the owner. (Suppliers are
+  // an admin-only page, so there this is always true.)
+  const isAdmin = useAuth().role === 'admin'
 
   const [search, setSearch] = useState('')
   const [withBalanceOnly, setWithBalanceOnly] = useState(false)
@@ -130,18 +135,20 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
               navigate(`/${partyType}s/${party.id}`)
             }}
           />
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="edit"
-            title="Edit"
-            aria-label={`Edit ${party.name}`}
-            onClick={(event) => {
-              event.stopPropagation()
-              setEditing(party)
-              setIsFormOpen(true)
-            }}
-          />
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="edit"
+              title="Edit"
+              aria-label={`Edit ${party.name}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                setEditing(party)
+                setIsFormOpen(true)
+              }}
+            />
+          )}
         </RowActions>
       )
     }
@@ -158,13 +165,15 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
         }
         actions={
           <>
-            <Button
-              icon="download"
-              loading={exportCsv.isPending}
-              onClick={() => void exportCsv.run()}
-            >
-              Export
-            </Button>
+            {isAdmin && (
+              <Button
+                icon="download"
+                loading={exportCsv.isPending}
+                onClick={() => void exportCsv.run()}
+              >
+                Export
+              </Button>
+            )}
             <Button
               variant="primary"
               icon="plus"
