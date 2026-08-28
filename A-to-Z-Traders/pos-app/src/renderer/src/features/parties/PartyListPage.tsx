@@ -221,7 +221,7 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <Card>
           <CardBody flush>
             <DataTable

@@ -101,7 +101,10 @@ export function OtherStockMovementModal({
 
         <SummaryList
           rows={[
-            { label: 'On the shelf now', value: format.qtyWithUnit(product.onHand, product.baseUnit) },
+            {
+              label: 'On the shelf now',
+              value: format.qtyWithUnit(product.onHand, product.baseUnit)
+            },
             {
               label: 'After this',
               value: format.qtyWithUnit(Math.max(0, resulting), product.baseUnit),

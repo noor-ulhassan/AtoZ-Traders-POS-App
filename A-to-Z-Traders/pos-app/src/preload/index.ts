@@ -176,6 +176,12 @@ const api = {
     list: () => invoke(IPC_CHANNELS.backupList)
   },
 
+  demo: {
+    status: () => invoke(IPC_CHANNELS.demoStatus),
+    seed: () => invoke(IPC_CHANNELS.demoSeed),
+    clear: () => invoke(IPC_CHANNELS.demoClear)
+  },
+
   printing: {
     receipt: (id) => invoke(IPC_CHANNELS.printReceipt, { id })
   },

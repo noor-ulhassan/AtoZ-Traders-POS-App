@@ -1,5 +1,9 @@
 import type { JSX } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../app/AuthContext'
 import { useSettings } from '../../app/SettingsContext'
+import { useQuery } from '../../hooks/useQuery'
+import { api, unwrap } from '../../lib/api'
 
 /**
  * A slim, always-visible strip at the bottom of every screen carrying the
@@ -10,10 +14,20 @@ import { useSettings } from '../../app/SettingsContext'
  * Only the details that have a value are shown, joined by middots, so a shop
  * that fills in just a name and phone gets a tidy line rather than a row of
  * empty separators.
+ *
+ * It also carries the sample-data warning. That belongs somewhere permanent and
+ * unmissable rather than on one screen: made-up bills sit in the same lists as
+ * real ones, and an owner who forgets they are there would read every total on
+ * every report as fact.
  */
 export function AppFooter(): JSX.Element {
   const { settings } = useSettings()
+  const isAdmin = useAuth().role === 'admin'
   const name = settings.businessName.trim() || 'A to Z Traders'
+
+  // Owner-only: the channel is admin-gated, so asking as a shopkeeper would be
+  // a guaranteed refusal on every screen load.
+  const demo = useQuery(async () => (isAdmin ? unwrap(api.demo.status()) : null), [isAdmin])
 
   const details = [
     settings.address.trim(),
@@ -33,6 +47,18 @@ export function AppFooter(): JSX.Element {
           <span>{detail}</span>
         </span>
       ))}
+
+      {demo.data?.present && (
+        <>
+          <span className="min-w-4 flex-1" />
+          <Link
+            to="/settings"
+            className="rounded-sm border border-warn-border bg-warn-weak px-2 py-0.5 font-medium text-warn hover:brightness-95"
+          >
+            Sample data is loaded — these figures are not real
+          </Link>
+        </>
+      )}
     </footer>
   )
 }

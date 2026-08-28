@@ -234,7 +234,7 @@ export function PurchaseEntryPage(): JSX.Element {
         }
       />
 
-      <PageBody>
+      <PageBody fill>
         <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-5">
           <Card>
             <div className="border-b border-line p-4">

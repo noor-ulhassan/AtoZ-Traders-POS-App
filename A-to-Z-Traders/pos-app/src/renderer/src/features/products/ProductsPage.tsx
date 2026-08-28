@@ -302,7 +302,7 @@ export function ProductsPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <Card>
           <CardBody flush>
             <DataTable

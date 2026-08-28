@@ -22,8 +22,7 @@ const ITEM_ACTIVE =
 export function Sidebar(): JSX.Element {
   const { settings } = useSettings()
   const { lock, role, status } = useAuth()
-  const whoLabel =
-    role === 'shopkeeper' ? (status.username ?? 'Shopkeeper') : 'Owner (admin)'
+  const whoLabel = role === 'shopkeeper' ? (status.username ?? 'Shopkeeper') : 'Owner (admin)'
 
   const brandName = settings.businessName?.trim() || 'A to Z Traders'
   const monogram = brandName.charAt(0).toUpperCase()
@@ -91,7 +90,9 @@ export function Sidebar(): JSX.Element {
           className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-nav-ink hover:bg-nav-hover hover:text-nav-ink-strong"
         >
           <Icon name="lock" size={16} className="shrink-0 opacity-85" />
-          <span className="flex-1 text-left">{role === 'shopkeeper' ? 'Sign out' : 'Lock app'}</span>
+          <span className="flex-1 text-left">
+            {role === 'shopkeeper' ? 'Sign out' : 'Lock app'}
+          </span>
         </button>
 
         <div className="rounded-lg bg-nav-hover px-3 py-2.5">

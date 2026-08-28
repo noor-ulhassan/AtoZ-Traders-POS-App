@@ -118,10 +118,7 @@ function buildFilter(filters: SaleFilters): { where: string; params: unknown[] }
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listSales(
-  db: Db,
-  filters: SaleFilters = {}
-): PageWithTotals<Sale, SalePageTotals> {
+export function listSales(db: Db, filters: SaleFilters = {}): PageWithTotals<Sale, SalePageTotals> {
   const { where, params } = buildFilter(filters)
   const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0

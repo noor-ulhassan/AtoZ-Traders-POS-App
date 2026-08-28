@@ -143,7 +143,7 @@ export function PurchasesPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile label="Purchases in period" unit={currency} value={format.money(total)} />
           <StatTile

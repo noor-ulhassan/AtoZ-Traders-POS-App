@@ -16,9 +16,10 @@ beforeEach(() => {
 })
 
 /** Runs the real two-step, skipping only the native file picker. */
-function importCsv(text: string, fileName = 'products.csv'): ReturnType<
-  typeof importService.commitImport
-> {
+function importCsv(
+  text: string,
+  fileName = 'products.csv'
+): ReturnType<typeof importService.commitImport> {
   const preview = importService.buildPreview(db, text, fileName)
   importService.stagePreview(preview)
   return importService.commitImport(preview.token)
@@ -247,7 +248,11 @@ describe('committing a file', () => {
     // Two rows sharing a barcode pass row-level checks only if the duplicate
     // detection is bypassed — so stage a preview by hand that the unique index
     // will reject, and assert nothing at all lands.
-    const preview = importService.buildPreview(db, 'name,barcode,price\nA,111,10\nB,222,20', 'x.csv')
+    const preview = importService.buildPreview(
+      db,
+      'name,barcode,price\nA,111,10\nB,222,20',
+      'x.csv'
+    )
     preview.rows[1]!.barcode = '111'
     importService.stagePreview(preview)
 

@@ -185,8 +185,8 @@ export function BackupPanel({ form, set, isDirty, onRestored }: BackupPanelProps
         {data?.health === 'failing' && data.lastError && (
           <div className="mt-3">
             <Callout tone="bad" title="The last backup did not complete">
-              {data.lastError} Check the folder still exists and has space, then press
-              &ldquo;Back up now&rdquo;.
+              {data.lastError} Check the folder still exists and has space, then press &ldquo;Back
+              up now&rdquo;.
             </Callout>
           </div>
         )}
@@ -203,8 +203,8 @@ export function BackupPanel({ form, set, isDirty, onRestored }: BackupPanelProps
         {data?.health === 'off' && (
           <div className="mt-3">
             <Callout tone="warn" title="Nothing is being backed up">
-              If this computer fails or is stolen, your records go with it. Set a folder below —
-              one that Google Drive or OneDrive syncs is best, because then the copies leave the
+              If this computer fails or is stolen, your records go with it. Set a folder below — one
+              that Google Drive or OneDrive syncs is best, because then the copies leave the
               building.
             </Callout>
           </div>

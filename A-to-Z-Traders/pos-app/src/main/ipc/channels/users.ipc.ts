@@ -1,11 +1,7 @@
 import { IPC_CHANNELS } from '@shared/ipc'
 import * as userService from '../../services/userService'
 import { noInput, registerHandler } from '../registry'
-import {
-  staffCreateSchema,
-  staffResetPinSchema,
-  staffSetActiveSchema
-} from '../schemas/auth'
+import { staffCreateSchema, staffResetPinSchema, staffSetActiveSchema } from '../schemas/auth'
 
 /**
  * Staff account management. None of these channels appear in the shopkeeper

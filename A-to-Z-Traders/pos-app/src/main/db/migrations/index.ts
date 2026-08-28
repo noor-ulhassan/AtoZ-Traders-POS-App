@@ -5,6 +5,7 @@ import staffUsers0004 from './0004_staff_users.sql?raw'
 import barcodeUnique0005 from './0005_product_barcode_unique.sql?raw'
 import backupSchedule0006 from './0006_backup_schedule.sql?raw'
 import otherStock0007 from './0007_other_stock.sql?raw'
+import demoRecords0008 from './0008_demo_records.sql?raw'
 
 export interface Migration {
   version: number
@@ -29,7 +30,8 @@ export const MIGRATIONS: Migration[] = [
   { version: 4, name: '0004_staff_users', sql: staffUsers0004 },
   { version: 5, name: '0005_product_barcode_unique', sql: barcodeUnique0005 },
   { version: 6, name: '0006_backup_schedule', sql: backupSchedule0006 },
-  { version: 7, name: '0007_other_stock', sql: otherStock0007 }
+  { version: 7, name: '0007_other_stock', sql: otherStock0007 },
+  { version: 8, name: '0008_demo_records', sql: demoRecords0008 }
 ]
 
 export const LATEST_VERSION = MIGRATIONS.reduce(

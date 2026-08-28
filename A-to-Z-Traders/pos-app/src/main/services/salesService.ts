@@ -123,9 +123,7 @@ export function createSale(input: SaleInput): { sale: SaleWithItems; receipt: Re
   assertStockIsAvailable(lines)
 
   const subtotal = sumMoney(lines.map((line) => line.amount))
-  const otherSubtotal = sumMoney(
-    lines.filter((line) => line.isOther).map((line) => line.amount)
-  )
+  const otherSubtotal = sumMoney(lines.filter((line) => line.isOther).map((line) => line.amount))
   const ownSubtotal = money(subtotal - otherSubtotal)
 
   const discount = money(input.discount ?? 0)

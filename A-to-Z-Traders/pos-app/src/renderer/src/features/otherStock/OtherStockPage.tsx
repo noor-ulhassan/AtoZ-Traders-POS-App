@@ -35,9 +35,10 @@ export function OtherStockPage(): JSX.Element {
   const [range, setRange] = useState<DateRange>(() => resolvePreset('last30'))
   const [ownerName, setOwnerName] = useState('')
   const [search, setSearch] = useState('')
-  const [movement, setMovement] = useState<{ product: OtherStockRow; direction: 'in' | 'out' } | null>(
-    null
-  )
+  const [movement, setMovement] = useState<{
+    product: OtherStockRow
+    direction: 'in' | 'out'
+  } | null>(null)
 
   const debouncedSearch = useDebounced(search)
 
@@ -183,18 +184,11 @@ export function OtherStockPage(): JSX.Element {
 
   return (
     <>
-      <PageHeader
-        title="Other stock"
-        subtitle="Goods you sell that belong to someone else"
-      />
+      <PageHeader title="Other stock" subtitle="Goods you sell that belong to someone else" />
 
       <FilterBar>
         <DateRangeFilter value={range} onChange={setRange} />
-        <SearchInput
-          value={search}
-          onValueChange={setSearch}
-          placeholder="Search item or owner"
-        />
+        <SearchInput value={search} onValueChange={setSearch} placeholder="Search item or owner" />
         <div style={{ width: 200 }}>
           <Select value={ownerName} onChange={(event) => setOwnerName(event.target.value)}>
             <option value="">All owners</option>

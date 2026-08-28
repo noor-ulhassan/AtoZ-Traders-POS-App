@@ -83,7 +83,7 @@ export function PurchaseReturnsPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile label="Returned in period" unit={currency} value={format.money(total)} />
           <StatTile label="Returns recorded" value={matched} />

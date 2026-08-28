@@ -92,7 +92,7 @@ export function DataTable<Row>({
   const density = compact ? 'h-8 px-3' : 'px-4'
 
   return (
-    <div className={clsx('w-full overflow-auto', className)}>
+    <div className={clsx('w-full min-h-0 flex-1 overflow-auto', className)}>
       <table className="w-full text-sm">
         <thead>
           <tr>

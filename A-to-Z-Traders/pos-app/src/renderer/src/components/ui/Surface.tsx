@@ -3,7 +3,16 @@ import type { HTMLAttributes, JSX, ReactNode } from 'react'
 
 /* Cards rest on a whisper of shadow (`shadow-card`) over their hairline border,
    so the workspace reads as layered paper. Popovers and modals sit clearly
-   higher, so elevation still ranks things. */
+   higher, so elevation still ranks things.
+
+   A card is a flex column, and that is load-bearing rather than decorative.
+   `PageBody` lays its cards out in a flex column that fills the screen, so when
+   a page holds more than fits — two tables on one screen, a long list — the
+   cards are asked to shrink. `overflow-hidden` (which is what keeps the rounded
+   corners honest) then means a shrunk card silently CUTS OFF its rows: no
+   scrollbar, no ellipsis, no sign anything is missing. The column below passes
+   that squeeze down to the table's own scroller instead, so the rows stay
+   reachable and the header and footer stay put. */
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode
@@ -13,7 +22,8 @@ export function Card({ className, children, ...props }: CardProps): JSX.Element 
   return (
     <div
       className={clsx(
-        'overflow-hidden rounded-lg border border-line bg-surface-raised shadow-card',
+        'flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-surface-raised',
+        'shadow-card',
         className
       )}
       {...props}
@@ -31,7 +41,7 @@ interface CardHeaderProps {
 
 export function CardHeader({ title, subtitle, actions }: CardHeaderProps): JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
+    <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-4">
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="text-base font-semibold">{title}</span>
         {subtitle && <span className="text-caption text-ink-muted">{subtitle}</span>}
@@ -49,7 +59,15 @@ interface CardBodyProps extends HTMLAttributes<HTMLDivElement> {
 
 export function CardBody({ flush, className, children, ...props }: CardBodyProps): JSX.Element {
   return (
-    <div className={clsx(flush ? 'p-0' : 'p-5', className)} {...props}>
+    <div
+      className={clsx(
+        // Flush bodies hold tables. They become the part of the card that gives
+        // when space is short, handing the squeeze to the table's own scroller.
+        flush ? 'flex min-h-0 flex-1 flex-col p-0' : 'p-5',
+        className
+      )}
+      {...props}
+    >
       {children}
     </div>
   )

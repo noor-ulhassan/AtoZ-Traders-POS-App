@@ -363,7 +363,11 @@ function freeSpaceFor(folder: string): number | null {
 
 const A_DAY = 24 * 60 * 60 * 1000
 
-function healthOf(folder: string, newest: BackupFile | undefined, error: string | null): BackupHealth {
+function healthOf(
+  folder: string,
+  newest: BackupFile | undefined,
+  error: string | null
+): BackupHealth {
   if (folder.trim() === '') return 'off'
   if (error) return 'failing'
   if (!newest) return 'never'

@@ -12,6 +12,9 @@ import type {
   DashboardSummary,
   DatabaseInfo,
   DateRange,
+  DemoClearResult,
+  DemoSeedResult,
+  DemoStatus,
   Expense,
   ExpenseCategory,
   ExpenseFilters,
@@ -190,6 +193,10 @@ export const IPC_CHANNELS = {
   backupRestore: 'backup:restore',
   backupRestoreFrom: 'backup:restoreFrom',
   backupInfo: 'backup:info',
+
+  demoStatus: 'demo:status',
+  demoSeed: 'demo:seed',
+  demoClear: 'demo:clear',
   backupStatus: 'backup:status',
   backupList: 'backup:list',
 
@@ -370,6 +377,18 @@ export interface PosApi {
     status(): Result<BackupStatus>
     /** The backups in the configured folder, newest first. */
     list(): Result<BackupFile[]>
+  }
+
+  /**
+   * Sample data for trying the app out.
+   *
+   * The seeder keeps a manifest of every row it creates, so `clear` removes the
+   * samples and nothing the shop entered itself.
+   */
+  demo: {
+    status(): Result<DemoStatus>
+    seed(): Result<DemoSeedResult>
+    clear(): Result<DemoClearResult>
   }
 
   printing: {

@@ -96,7 +96,7 @@ export function SaleReturnsPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile label="Returned in period" unit={currency} value={format.money(total)} />
           <StatTile label="Cash refunded" unit={currency} value={format.money(cashRefunded)} />

@@ -1,5 +1,6 @@
 import { IPC_CHANNELS } from '@shared/ipc'
 import * as backupService from '../../services/backupService'
+import * as demoDataService from '../../services/demoDataService'
 import * as salesService from '../../services/salesService'
 import { printReceipt } from '../../printing/printer'
 import { logger } from '../../utils/logger'
@@ -11,13 +12,20 @@ const rendererLog = logger.child('renderer')
 
 export function registerSystemHandlers(): void {
   registerHandler(IPC_CHANNELS.backupNow, noInput, () => backupService.backupNow())
-  registerHandler(IPC_CHANNELS.backupRunNow, noInput, () => backupService.backupToConfiguredFolder())
+  registerHandler(IPC_CHANNELS.backupRunNow, noInput, () =>
+    backupService.backupToConfiguredFolder()
+  )
   registerHandler(IPC_CHANNELS.backupRestore, noInput, () => backupService.restoreFromFile())
   registerHandler(IPC_CHANNELS.backupRestoreFrom, backupPathSchema, ({ path }) =>
     backupService.restoreFromPath(path)
   )
   registerHandler(IPC_CHANNELS.backupInfo, noInput, () => backupService.databaseInfo())
   registerHandler(IPC_CHANNELS.backupStatus, noInput, () => backupService.backupStatus())
+
+  // ---- sample data. Owner-only: it writes and deletes across every table.
+  registerHandler(IPC_CHANNELS.demoStatus, noInput, () => demoDataService.demoStatus())
+  registerHandler(IPC_CHANNELS.demoSeed, noInput, () => demoDataService.seedDemoData())
+  registerHandler(IPC_CHANNELS.demoClear, noInput, () => demoDataService.clearDemoData())
   registerHandler(IPC_CHANNELS.backupList, noInput, () => backupService.listConfiguredBackups())
 
   registerHandler(IPC_CHANNELS.printReceipt, saleIdSchema, async ({ id }) => {

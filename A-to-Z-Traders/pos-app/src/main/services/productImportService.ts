@@ -73,7 +73,10 @@ let pending: { token: string; fileName: string; rows: ImportRowPreview[] } | nul
 type ColumnMap = Partial<Record<Field, number>>
 
 function normaliseHeader(raw: string): string {
-  return raw.trim().toLowerCase().replace(/[\s_-]+/g, ' ')
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, ' ')
 }
 
 function mapColumns(header: string[]): { map: ColumnMap; unknown: string[] } {

@@ -179,7 +179,7 @@ export function ExpensesPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile
             label="Total in period"

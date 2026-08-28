@@ -58,7 +58,9 @@ export function LockScreen(): JSX.Element {
   }
 
   const canSubmit =
-    mode === 'owner' ? password.length > 0 && !status.locked : username.trim().length > 0 && pin.length > 0
+    mode === 'owner'
+      ? password.length > 0 && !status.locked
+      : username.trim().length > 0 && pin.length > 0
 
   return (
     <>

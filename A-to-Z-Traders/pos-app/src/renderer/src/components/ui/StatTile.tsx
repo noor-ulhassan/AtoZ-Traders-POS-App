@@ -40,6 +40,37 @@ interface StatTileProps {
 }
 
 /**
+ * Sizes the number to the space a tile actually has.
+ *
+ * A shop's headline figures are not all the same length: takings for a quiet
+ * Tuesday and an all-time cash position can differ by four digits. At one fixed
+ * size the long ones were truncated — "PKR -8,342,689..." — which turns the most
+ * important number on the screen into a number the owner cannot read. Stepping
+ * the size down keeps the whole figure visible, and a tile that steps down is
+ * itself a signal that the number got big.
+ */
+function sizeFor(value: ReactNode): string {
+  const length = typeof value === 'string' || typeof value === 'number' ? String(value).length : 0
+
+  /*
+   * The thresholds are measured, not guessed. A tile in the narrowest grid
+   * leaves about 154px for the figure once the currency code and the gap are
+   * taken out, and this scale's tabular digits run near 0.475em wide:
+   *
+   *   text-xl  29px -> ~13.8px a character -> ~11 fit
+   *   text-lg  21px -> ~10.0px a character -> ~15 fit
+   *   text-md  17px ->  ~8.1px a character -> ~19 fit
+   *
+   * Deliberately conservative: they assume the narrowest tile with a currency
+   * code beside it, so a figure never truncates on the small screen the shop
+   * actually runs.
+   */
+  if (length > 15) return 'text-md'
+  if (length > 11) return 'text-lg'
+  return 'text-xl'
+}
+
+/**
  * One number, said once.
  *
  * The label is small and quiet, the number is the loudest thing in the tile,
@@ -71,11 +102,18 @@ export function StatTile({
         {label}
       </span>
       <span className="flex min-w-0 items-baseline gap-2">
-        {unit && <span className="text-caption font-medium text-ink-subtle">{unit}</span>}
+        {unit && <span className="shrink-0 text-caption font-medium text-ink-subtle">{unit}</span>}
         <span
+          // `title` is the last resort: if a figure is somehow still too wide
+          // for its tile, it stays readable on hover rather than being lost.
+          title={typeof value === 'string' || typeof value === 'number' ? String(value) : undefined}
           className={clsx(
-            'truncate font-display text-xl font-semibold tracking-[-0.01em] tabular-nums',
-            'leading-[1.1]',
+            'truncate font-display font-semibold tracking-[-0.01em] tabular-nums',
+            // Not tighter than this: `truncate` clips overflow, and at 1.1 the
+            // line box was shorter than the glyphs, shaving the tails off the
+            // commas in every figure on the dashboard.
+            'leading-[1.25]',
+            sizeFor(value),
             VALUE_TONES[tone]
           )}
         >

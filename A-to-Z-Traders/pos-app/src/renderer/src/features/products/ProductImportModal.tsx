@@ -35,10 +35,7 @@ const ACTION_BADGE: Record<
  * the renderer — the main process commits the rows it parsed itself, named by
  * a token. So what is approved on this screen is exactly what lands.
  */
-export function ProductImportModal({
-  onClose,
-  onImported
-}: ProductImportModalProps): JSX.Element {
+export function ProductImportModal({ onClose, onImported }: ProductImportModalProps): JSX.Element {
   const currency = useCurrency()
   const [preview, setPreview] = useState<ProductImportPreview | null>(null)
   const [filter, setFilter] = useState<RowFilter>('all')
@@ -54,17 +51,14 @@ export function ProductImportModal({
     }
   })
 
-  const commit = useMutation(
-    async (token: string) => unwrap(api.products.import.commit(token)),
-    {
-      errorTitle: 'Could not import the products',
-      onSuccess: (result) => {
-        if (!result) return
-        onImported()
-        onClose()
-      }
+  const commit = useMutation(async (token: string) => unwrap(api.products.import.commit(token)), {
+    errorTitle: 'Could not import the products',
+    onSuccess: (result) => {
+      if (!result) return
+      onImported()
+      onClose()
     }
-  )
+  })
 
   const rows = preview?.rows ?? []
   const shown = filter === 'all' ? rows : rows.filter((row) => row.action === filter)
@@ -120,9 +114,11 @@ export function ProductImportModal({
       // Stock only ever applies to a product the file is creating; showing a
       // figure against an update would promise something that will not happen.
       render: (row) =>
-        row.action === 'create' && row.openingStock > 0
-          ? format.quantity(row.openingStock)
-          : <span className="text-ink-subtle">—</span>
+        row.action === 'create' && row.openingStock > 0 ? (
+          format.quantity(row.openingStock)
+        ) : (
+          <span className="text-ink-subtle">—</span>
+        )
     },
     {
       key: 'notes',
@@ -164,8 +160,8 @@ export function ProductImportModal({
       footerStart={
         preview && (
           <span className="text-caption text-ink-muted">
-            {preview.counts.create} new · {preview.counts.update} updated ·{' '}
-            {preview.counts.skip} skipped
+            {preview.counts.create} new · {preview.counts.update} updated · {preview.counts.skip}{' '}
+            skipped
           </span>
         )
       }
@@ -191,8 +187,8 @@ export function ProductImportModal({
       {!preview ? (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-ink-muted">
-            Save your list as CSV from Excel, then choose it here. Nothing is written until you
-            have seen what the file will do.
+            Save your list as CSV from Excel, then choose it here. Nothing is written until you have
+            seen what the file will do.
           </p>
 
           <div className="rounded-md border border-line bg-surface-sunken p-4">

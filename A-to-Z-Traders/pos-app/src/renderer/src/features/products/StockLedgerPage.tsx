@@ -145,7 +145,7 @@ export function StockLedgerPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <Card>
           <CardBody flush>
             <DataTable

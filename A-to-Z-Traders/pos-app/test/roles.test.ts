@@ -146,6 +146,10 @@ describe('access policy (fail-closed)', () => {
     // Bulk import rewrites the catalogue and its prices in one go.
     expect(isAuthorized(IPC_CHANNELS.productsImportPreview, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.productsImportCommit, {})).toBe(false)
+    // Sample data writes and deletes across every table in the database.
+    expect(isAuthorized(IPC_CHANNELS.demoStatus, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.demoSeed, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.demoClear, {})).toBe(false)
     // The consignment register is an account of someone else's property.
     expect(isAuthorized(IPC_CHANNELS.otherStockReport, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.otherStockReceive, {})).toBe(false)

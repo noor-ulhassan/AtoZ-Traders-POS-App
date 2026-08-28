@@ -120,9 +120,9 @@ describe('the folder guard', () => {
   })
 
   it('is enforced when the setting is saved, not only when a backup runs', () => {
-    expect(() => settingsService.updateSettings({ autoBackupDir: dirname(databasePath()) })).toThrow(
-      /live database/i
-    )
+    expect(() =>
+      settingsService.updateSettings({ autoBackupDir: dirname(databasePath()) })
+    ).toThrow(/live database/i)
     // The bad value must not have been written.
     expect(settingsService.getSettings().autoBackupDir).toBe('')
   })
@@ -345,7 +345,9 @@ describe('the on-quit copy', () => {
     try {
       // Written moments ago and still in the WAL until the checkpoint. A copy
       // taken without one would silently be missing today's trade.
-      expect(probe.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM products').get()?.n).toBe(1)
+      expect(probe.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM products').get()?.n).toBe(
+        1
+      )
     } finally {
       probe.close()
     }

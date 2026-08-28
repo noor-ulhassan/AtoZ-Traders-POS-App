@@ -100,7 +100,11 @@ interface TrendTooltipProps {
   showProfit?: boolean
 }
 
-function TrendTooltip({ active, payload, showProfit = true }: TrendTooltipProps): JSX.Element | null {
+function TrendTooltip({
+  active,
+  payload,
+  showProfit = true
+}: TrendTooltipProps): JSX.Element | null {
   if (!active || !payload?.length) return null
   const point = payload[0].payload
   return (

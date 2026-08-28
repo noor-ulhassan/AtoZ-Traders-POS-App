@@ -177,7 +177,7 @@ export function SalesPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid min={190}>
           <StatTile
             label="Sales"

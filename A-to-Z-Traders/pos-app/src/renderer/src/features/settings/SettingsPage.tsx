@@ -15,6 +15,7 @@ import * as format from '../../lib/format'
 import { useSettings } from '../../app/SettingsContext'
 import { ChangePasswordModal } from '../auth/ChangePasswordModal'
 import { BackupPanel } from './BackupPanel'
+import { DemoDataPanel } from './DemoDataPanel'
 
 interface InfoRowProps {
   label: string
@@ -63,6 +64,15 @@ export function SettingsPage(): JSX.Element {
   const save = useMutation(async () => persist(form), {
     successMessage: 'Settings saved'
   })
+
+  /**
+   * Adding or removing sample data rewrites what every screen is showing, so
+   * the honest response is the same one a restore gets: reload, and let the
+   * whole app read the database again.
+   */
+  const reloadAfterDataChange = (): void => {
+    setTimeout(() => window.location.reload(), 1200)
+  }
 
   const onRestored = (safetyCopyPath: string): void => {
     toast.success(
@@ -222,6 +232,8 @@ export function SettingsPage(): JSX.Element {
 
           <div className="flex flex-col gap-5">
             <BackupPanel form={form} set={set} isDirty={isDirty} onRestored={onRestored} />
+
+            <DemoDataPanel onChanged={reloadAfterDataChange} />
 
             <Card>
               <CardHeader title="Security" subtitle="The admin password that locks this app" />

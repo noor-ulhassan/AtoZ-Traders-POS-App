@@ -204,7 +204,7 @@ export function PaymentsPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile label="Received" unit={currency} value={format.money(received)} tone="good" />
           <StatTile label="Paid out" unit={currency} value={format.money(paid)} tone="bad" />

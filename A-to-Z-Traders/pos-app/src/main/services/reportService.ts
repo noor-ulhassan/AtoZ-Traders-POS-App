@@ -243,13 +243,20 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
   }
 
   // Days with no sales still belong on the chart — a flat line is information.
+  // `eachDay` stops after ten years, so a very long range draws a truncated
+  // chart rather than looping forever.
   const daily = eachDay(range).map<SalesSummaryPoint>(
     (date) => byDate.get(date) ?? { date, sales: 0, profit: 0, billCount: 0 }
   )
 
-  const totalSales = money(daily.reduce((sum, point) => sum + point.sales, 0))
-  const totalProfit = money(daily.reduce((sum, point) => sum + point.profit, 0))
-  const billCount = daily.reduce((sum, point) => sum + point.billCount, 0)
+  // Totalled from the query, not from `daily`. Reducing over the chart's days
+  // tied the headline figures to how many points the chart happened to draw —
+  // so a range past that ten-year stop reported a shop with no sales at all,
+  // silently and with a straight face. The chart may be clipped; the totals
+  // must always describe the period that was asked for.
+  const totalSales = money(rows.reduce((sum, row) => sum + row.sales, 0))
+  const totalProfit = money(rows.reduce((sum, row) => sum + (row.sales - row.cogs), 0))
+  const billCount = rows.reduce((sum, row) => sum + row.bill_count, 0)
 
   const report: SalesSummaryReport = {
     range,
