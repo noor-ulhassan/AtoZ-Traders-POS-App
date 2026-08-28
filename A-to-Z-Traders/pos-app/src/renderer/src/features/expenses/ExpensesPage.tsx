@@ -5,13 +5,20 @@ import { resolvePreset } from '@shared/date'
 import { Button } from '../../components/ui/Button'
 import { SearchInput, Select } from '../../components/ui/Field'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell, RowActions } from '../../components/ui/DataTable'
+import {
+  Column,
+  DataTable,
+  PrimaryCell,
+  RowActions,
+  TablePager
+} from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -30,6 +37,8 @@ export function ExpensesPage(): JSX.Element {
 
   const debouncedSearch = useDebounced(search)
 
+  const paging = usePagination([range.from, range.to, debouncedSearch, categoryId])
+
   const categories = useQuery(() => unwrap(api.expenses.categories.list()), [])
   const expenses = useQuery(
     () =>
@@ -39,10 +48,11 @@ export function ExpensesPage(): JSX.Element {
           to: range.to,
           search: debouncedSearch || undefined,
           categoryId: categoryId ? Number(categoryId) : null,
-          limit: 500
+          limit: paging.limit,
+          offset: paging.offset
         })
       ),
-    [range.from, range.to, debouncedSearch, categoryId]
+    [range.from, range.to, debouncedSearch, categoryId, paging.offset, paging.limit]
   )
 
   const exportCsv = useMutation(
@@ -67,7 +77,9 @@ export function ExpensesPage(): JSX.Element {
   }
 
   const rows = expenses.data?.rows ?? []
-  const total = rows.reduce((sum, row) => sum + row.amount, 0)
+  const matched = expenses.data?.total ?? 0
+  const total = expenses.data?.totals.amount ?? 0
+  const page = useClampedPage(paging, matched)
   const biggest = rows.reduce<Expense | null>(
     (largest, row) => (largest === null || row.amount > largest.amount ? row : largest),
     null
@@ -167,7 +179,7 @@ export function ExpensesPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile
             label="Total in period"
@@ -175,7 +187,7 @@ export function ExpensesPage(): JSX.Element {
             value={format.money(total)}
             tone="bad"
           />
-          <StatTile label="Entries" value={rows.length} />
+          <StatTile label="Entries" value={matched} />
           <StatTile
             label="Largest single expense"
             unit={currency}
@@ -209,6 +221,13 @@ export function ExpensesPage(): JSX.Element {
                   </Button>
                 )
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={matched}
+              onPageChange={paging.setPage}
+              noun="expenses"
             />
           </CardBody>
         </Card>

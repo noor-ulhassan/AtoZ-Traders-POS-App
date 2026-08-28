@@ -1,11 +1,12 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   PriceSuggestion,
   Receipt,
   Sale,
   SaleFilters,
   SaleInput,
+  SalePageTotals,
   SaleWithItems
 } from '@shared/types'
 import { today } from '@shared/date'
@@ -20,7 +21,7 @@ import { requireParty } from './partyService'
 import { requireProduct, resolveUnit } from './productService'
 import { getSettings } from './settingsService'
 
-export function listSales(filters: SaleFilters = {}): Page<Sale> {
+export function listSales(filters: SaleFilters = {}): PageWithTotals<Sale, SalePageTotals> {
   return sales.listSales(getDb(), filters)
 }
 
@@ -99,6 +100,8 @@ export function createSale(input: SaleInput): { sale: SaleWithItems; receipt: Re
       throw businessRule(`The discount on "${product.name}" is more than the line total.`)
     }
 
+    const isOther = product.ownership === 'other'
+
     return {
       product,
       unitName: unit.unitName,
@@ -108,8 +111,11 @@ export function createSale(input: SaleInput): { sale: SaleWithItems; receipt: Re
       rate: money(item.rate),
       lineDiscount,
       // Cost is frozen onto the line so profit is fixed at sale time and
-      // unaffected by later purchases (Guide §1.8).
-      costPrice: product.costPrice,
+      // unaffected by later purchases (Guide §1.8). Consignment goods have no
+      // cost to the shop, so the line carries zero and is marked, which is what
+      // keeps it out of COGS and every margin below.
+      costPrice: isOther ? 0 : product.costPrice,
+      isOther,
       amount: money(gross - lineDiscount)
     }
   })
@@ -117,9 +123,19 @@ export function createSale(input: SaleInput): { sale: SaleWithItems; receipt: Re
   assertStockIsAvailable(lines)
 
   const subtotal = sumMoney(lines.map((line) => line.amount))
+  const otherSubtotal = sumMoney(lines.filter((line) => line.isOther).map((line) => line.amount))
+  const ownSubtotal = money(subtotal - otherSubtotal)
+
   const discount = money(input.discount ?? 0)
-  if (discount > subtotal) {
-    throw businessRule('The bill discount cannot be more than the bill subtotal.')
+  // A bill discount comes out of the shop's own margin, so it may only be given
+  // against the shop's own goods. Letting it eat into consignment lines would
+  // quietly hand away money that belongs to whoever owns them.
+  if (discount > ownSubtotal) {
+    throw otherSubtotal > 0
+      ? businessRule(
+          'A discount can only be given on your own goods. Other stock on this bill is sold at its full price.'
+        )
+      : businessRule('The bill discount cannot be more than the bill subtotal.')
   }
 
   const taxable = money(subtotal - discount)
@@ -146,6 +162,7 @@ export function createSale(input: SaleInput): { sale: SaleWithItems; receipt: Re
       customerId,
       date,
       subtotal,
+      otherSubtotal,
       discount,
       tax,
       total,
@@ -165,6 +182,7 @@ export function createSale(input: SaleInput): { sale: SaleWithItems; receipt: Re
         rate: line.rate,
         lineDiscount: line.lineDiscount,
         costPrice: line.costPrice,
+        isOther: line.isOther,
         amount: line.amount
       })
 

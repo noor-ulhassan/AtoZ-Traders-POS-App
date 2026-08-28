@@ -59,3 +59,10 @@ export interface PurchaseFilters {
   limit?: number
   offset?: number
 }
+
+/** Aggregates over every purchase the filters match, not just the page shown. */
+export interface PurchasePageTotals {
+  total: number
+  /** SUM(MAX(0, total - paid)) — what is still owed on these purchases. */
+  unpaid: number
+}

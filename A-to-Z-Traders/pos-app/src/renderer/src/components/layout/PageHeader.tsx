@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import type { JSX, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '../icons/Icon'
@@ -33,9 +34,30 @@ export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps):
   )
 }
 
-/** The padded region a screen's cards and tables live in. */
-export function PageBody({ children }: { children: ReactNode }): JSX.Element {
-  return <div className="flex min-h-0 flex-1 flex-col gap-5 p-6">{children}</div>
+/**
+ * The padded region a screen's cards and tables live in.
+ *
+ * By default the body is as tall as what it holds and the work area scrolls
+ * around it. That is the right behaviour whenever a screen stacks several
+ * cards: asking four cards to share one screenful squeezes each into a sliver,
+ * and a three-row table in a sliver is a table nobody can read.
+ *
+ * `fill` is for the opposite shape — one card holding one long list. There the
+ * card taking the full height, with the table scrolling inside it, keeps the
+ * column headers and the pager pinned where the eye expects them.
+ */
+export function PageBody({
+  fill = false,
+  children
+}: {
+  fill?: boolean
+  children: ReactNode
+}): JSX.Element {
+  return (
+    <div className={clsx('flex flex-col gap-5 p-6', fill ? 'min-h-0 flex-1' : 'shrink-0')}>
+      {children}
+    </div>
+  )
 }
 
 /** A full-bleed strip of filters between the header and the body. */

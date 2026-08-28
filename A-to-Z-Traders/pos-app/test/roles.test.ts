@@ -143,6 +143,62 @@ describe('access policy (fail-closed)', () => {
     expect(isAuthorized(IPC_CHANNELS.expensesAdd, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.backupRestore, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.paymentsDelete, {})).toBe(false)
+    // Bulk import rewrites the catalogue and its prices in one go.
+    expect(isAuthorized(IPC_CHANNELS.productsImportPreview, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.productsImportCommit, {})).toBe(false)
+    // Sample data writes and deletes across every table in the database.
+    expect(isAuthorized(IPC_CHANNELS.demoStatus, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.demoSeed, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.demoClear, {})).toBe(false)
+    // The consignment register is an account of someone else's property.
+    expect(isAuthorized(IPC_CHANNELS.otherStockReport, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.otherStockReceive, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.otherStockReturn, {})).toBe(false)
+    // Backups: the folder, the copies, and the ability to replace everything.
+    expect(isAuthorized(IPC_CHANNELS.backupStatus, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupList, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupRunNow, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupRestoreFrom, {})).toBe(false)
+  })
+
+  it('denies a shopkeeper any channel added since the allowlist was written', () => {
+    unlock('shopkeeper', 'ali')
+    // The policy is an allowlist, so a new channel is owner-only until someone
+    // deliberately opens it. This asserts the property rather than a list, so
+    // it keeps holding as channels are added.
+    const allowed = new Set<string>([
+      IPC_CHANNELS.settingsGet,
+      IPC_CHANNELS.categoriesList,
+      IPC_CHANNELS.productsList,
+      IPC_CHANNELS.productsGet,
+      IPC_CHANNELS.productsSellableUnits,
+      IPC_CHANNELS.productsUnitsList,
+      IPC_CHANNELS.customersList,
+      IPC_CHANNELS.customersGet,
+      IPC_CHANNELS.customersLedger,
+      IPC_CHANNELS.customersAdd,
+      IPC_CHANNELS.salesList,
+      IPC_CHANNELS.salesGet,
+      IPC_CHANNELS.salesCreate,
+      IPC_CHANNELS.salesNextInvoiceNo,
+      IPC_CHANNELS.salesSuggestPrice,
+      IPC_CHANNELS.salesReceipt,
+      IPC_CHANNELS.printReceipt,
+      IPC_CHANNELS.saleReturnsList,
+      IPC_CHANNELS.saleReturnsGet,
+      IPC_CHANNELS.saleReturnsCreate,
+      IPC_CHANNELS.paymentsCreate,
+      IPC_CHANNELS.paymentsList,
+      IPC_CHANNELS.dashboardSummary,
+      IPC_CHANNELS.reportsSalesSummary,
+      IPC_CHANNELS.systemLogError
+    ])
+
+    const wronglyOpen = Object.values(IPC_CHANNELS).filter(
+      (channel) => !allowed.has(channel) && isAuthorized(channel, {})
+    )
+
+    expect(wronglyOpen).toEqual([])
   })
 
   it('lets a shopkeeper record a customer receipt but never a supplier payout', () => {

@@ -4,32 +4,47 @@ import type {
   AuthResetInput,
   AuthSetupInput,
   AuthStatus,
+  BackupFile,
   BackupResult,
+  BackupStatus,
   Category,
   Customer,
   DashboardSummary,
   DatabaseInfo,
   DateRange,
+  DemoClearResult,
+  DemoSeedResult,
+  DemoStatus,
   Expense,
   ExpenseCategory,
   ExpenseFilters,
   ExpenseInput,
+  ExpensePageTotals,
   ExportRequest,
   ExportResult,
   Id,
   IpcResult,
   LedgerStatement,
   LowStockRow,
+  OtherStockFilters,
+  OtherStockMovementInput,
+  OtherStockReport,
   Page,
+  PageWithTotals,
   PartyFilters,
   PartyInput,
+  PartyPageTotals,
   Payment,
   PaymentFilters,
   PaymentInput,
+  PaymentPageTotals,
   PriceSuggestion,
   Product,
   ProductFilters,
+  ProductImportPreview,
+  ProductImportResult,
   ProductInput,
+  ProductPageTotals,
   ProductProfitRow,
   ProductUnit,
   ProductUnitInput,
@@ -38,6 +53,7 @@ import type {
   Purchase,
   PurchaseFilters,
   PurchaseInput,
+  PurchasePageTotals,
   PurchaseReturn,
   PurchaseReturnInput,
   PurchaseReturnWithItems,
@@ -45,9 +61,11 @@ import type {
   Receipt,
   RestoreResult,
   ReturnFilters,
+  ReturnPageTotals,
   Sale,
   SaleFilters,
   SaleInput,
+  SalePageTotals,
   SaleReturn,
   SaleReturnInput,
   SaleReturnWithItems,
@@ -108,9 +126,16 @@ export const IPC_CHANNELS = {
   productsUnitsList: 'products:units:list',
   productsUnitsSet: 'products:units:set',
   productsSellableUnits: 'products:sellableUnits',
+  productsImportPreview: 'products:import:preview',
+  productsImportCommit: 'products:import:commit',
 
   stockAdjust: 'stock:adjust',
   stockMovements: 'stock:movements',
+
+  otherStockReport: 'otherStock:report',
+  otherStockOwners: 'otherStock:owners',
+  otherStockReceive: 'otherStock:receive',
+  otherStockReturn: 'otherStock:return',
 
   customersList: 'customers:list',
   customersGet: 'customers:get',
@@ -164,8 +189,16 @@ export const IPC_CHANNELS = {
   exportCsv: 'export:csv',
 
   backupNow: 'backup:now',
+  backupRunNow: 'backup:runNow',
   backupRestore: 'backup:restore',
+  backupRestoreFrom: 'backup:restoreFrom',
   backupInfo: 'backup:info',
+
+  demoStatus: 'demo:status',
+  demoSeed: 'demo:seed',
+  demoClear: 'demo:clear',
+  backupStatus: 'backup:status',
+  backupList: 'backup:list',
 
   printReceipt: 'printing:receipt',
 
@@ -210,7 +243,7 @@ export interface PosApi {
   }
 
   products: {
-    list(filters?: ProductFilters): Result<Page<Product>>
+    list(filters?: ProductFilters): Result<PageWithTotals<Product, ProductPageTotals>>
     get(id: Id): Result<ProductWithUnits>
     add(input: ProductInput): Result<Product>
     update(id: Id, input: ProductInput): Result<Product>
@@ -220,6 +253,19 @@ export interface PosApi {
       list(productId: Id): Result<ProductUnit[]>
       set(productId: Id, units: ProductUnitInput[]): Result<ProductUnit[]>
     }
+    /**
+     * Bulk import from a spreadsheet, always in two steps.
+     *
+     * `preview` opens the file picker, parses and validates, and writes
+     * nothing — it returns a per-row account of what committing would do,
+     * plus a token identifying the parsed file. `commit` takes that token, so
+     * the rows written are the rows the main process itself validated, never
+     * a version echoed back from the renderer.
+     */
+    import: {
+      preview(): Result<ProductImportPreview>
+      commit(token: string): Result<ProductImportResult>
+    }
   }
 
   stock: {
@@ -227,8 +273,21 @@ export interface PosApi {
     movements(filters?: StockMovementFilters): Result<Page<StockMovement>>
   }
 
+  /**
+   * Goods the shop sells but does not own.
+   *
+   * Intake and return deliberately sit here rather than under purchases: no
+   * money moves either way, and no supplier balance is involved.
+   */
+  otherStock: {
+    report(filters?: OtherStockFilters): Result<OtherStockReport>
+    owners(): Result<string[]>
+    receive(input: OtherStockMovementInput): Result<{ productId: Id; stockQty: number }>
+    sendBack(input: OtherStockMovementInput): Result<{ productId: Id; stockQty: number }>
+  }
+
   customers: {
-    list(filters?: PartyFilters): Result<Page<Customer>>
+    list(filters?: PartyFilters): Result<PageWithTotals<Customer, PartyPageTotals>>
     get(id: Id): Result<Customer>
     add(input: PartyInput): Result<Customer>
     update(id: Id, input: PartyInput): Result<Customer>
@@ -236,7 +295,7 @@ export interface PosApi {
   }
 
   suppliers: {
-    list(filters?: PartyFilters): Result<Page<Supplier>>
+    list(filters?: PartyFilters): Result<PageWithTotals<Supplier, PartyPageTotals>>
     get(id: Id): Result<Supplier>
     add(input: PartyInput): Result<Supplier>
     update(id: Id, input: PartyInput): Result<Supplier>
@@ -244,13 +303,13 @@ export interface PosApi {
   }
 
   purchases: {
-    list(filters?: PurchaseFilters): Result<Page<Purchase>>
+    list(filters?: PurchaseFilters): Result<PageWithTotals<Purchase, PurchasePageTotals>>
     get(id: Id): Result<PurchaseWithItems>
     create(input: PurchaseInput): Result<PurchaseWithItems>
   }
 
   sales: {
-    list(filters?: SaleFilters): Result<Page<Sale>>
+    list(filters?: SaleFilters): Result<PageWithTotals<Sale, SalePageTotals>>
     get(id: Id): Result<SaleWithItems>
     create(input: SaleInput): Result<{ sale: SaleWithItems; receipt: Receipt }>
     nextInvoiceNo(): Result<string>
@@ -260,12 +319,12 @@ export interface PosApi {
 
   returns: {
     sale: {
-      list(filters?: ReturnFilters): Result<Page<SaleReturn>>
+      list(filters?: ReturnFilters): Result<PageWithTotals<SaleReturn, ReturnPageTotals>>
       get(id: Id): Result<SaleReturnWithItems>
       create(input: SaleReturnInput): Result<SaleReturnWithItems>
     }
     purchase: {
-      list(filters?: ReturnFilters): Result<Page<PurchaseReturn>>
+      list(filters?: ReturnFilters): Result<PageWithTotals<PurchaseReturn, ReturnPageTotals>>
       get(id: Id): Result<PurchaseReturnWithItems>
       create(input: PurchaseReturnInput): Result<PurchaseReturnWithItems>
     }
@@ -273,7 +332,7 @@ export interface PosApi {
 
   payments: {
     create(input: PaymentInput): Result<Payment>
-    list(filters?: PaymentFilters): Result<Page<Payment>>
+    list(filters?: PaymentFilters): Result<PageWithTotals<Payment, PaymentPageTotals>>
     remove(id: Id): Result<{ id: Id }>
   }
 
@@ -282,7 +341,7 @@ export interface PosApi {
       list(): Result<ExpenseCategory[]>
       add(name: string): Result<ExpenseCategory>
     }
-    list(filters?: ExpenseFilters): Result<Page<Expense>>
+    list(filters?: ExpenseFilters): Result<PageWithTotals<Expense, ExpensePageTotals>>
     add(input: ExpenseInput): Result<Expense>
     update(id: Id, input: ExpenseInput): Result<Expense>
     remove(id: Id): Result<{ id: Id }>
@@ -305,9 +364,31 @@ export interface PosApi {
   }
 
   backup: {
+    /** Pick a folder and save one copy there — a USB stick, say. */
     now(): Result<BackupResult>
+    /** Back up to the configured folder immediately, without a dialog. */
+    runNow(): Result<BackupResult>
+    /** Pick any backup file on this machine and restore it. */
     restore(): Result<RestoreResult>
+    /** Restore one of the backups `list()` returned. */
+    restoreFrom(path: string): Result<RestoreResult>
     info(): Result<DatabaseInfo>
+    /** Whether backups are actually happening, and how recently. */
+    status(): Result<BackupStatus>
+    /** The backups in the configured folder, newest first. */
+    list(): Result<BackupFile[]>
+  }
+
+  /**
+   * Sample data for trying the app out.
+   *
+   * The seeder keeps a manifest of every row it creates, so `clear` removes the
+   * samples and nothing the shop entered itself.
+   */
+  demo: {
+    status(): Result<DemoStatus>
+    seed(): Result<DemoSeedResult>
+    clear(): Result<DemoClearResult>
   }
 
   printing: {

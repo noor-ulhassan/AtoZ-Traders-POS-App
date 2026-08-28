@@ -51,7 +51,9 @@ export function renderPlainText(receipt: Receipt): string {
   rows.push(line())
 
   for (const item of receipt.lines) {
-    rows.push(item.name)
+    // Marked on the printed copy too, so a bill can be reconciled against the
+    // goods' owner from the paper alone.
+    rows.push(item.isOther ? `${item.name} *` : item.name)
     rows.push(
       twoColumns(`  ${item.qty} ${item.unitName} x ${amount(item.rate)}`, amount(item.amount))
     )
@@ -60,6 +62,9 @@ export function renderPlainText(receipt: Receipt): string {
 
   rows.push(line())
   rows.push(twoColumns('Subtotal', amount(receipt.totals.subtotal)))
+  if (receipt.totals.otherSubtotal > 0) {
+    rows.push(twoColumns('  * of which other stock', amount(receipt.totals.otherSubtotal)))
+  }
   if (receipt.totals.discount > 0) {
     rows.push(twoColumns('Discount', `-${amount(receipt.totals.discount)}`))
   }

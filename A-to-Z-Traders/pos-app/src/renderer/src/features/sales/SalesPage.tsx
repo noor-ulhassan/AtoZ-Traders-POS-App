@@ -7,12 +7,13 @@ import { Button } from '../../components/ui/Button'
 import { SearchInput, Select } from '../../components/ui/Field'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell, TablePager } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -38,6 +39,8 @@ export function SalesPage(): JSX.Element {
 
   const debouncedSearch = useDebounced(search)
 
+  const paging = usePagination([range.from, range.to, paymentType, debouncedSearch])
+
   const sales = useQuery(
     () =>
       unwrap(
@@ -46,10 +49,11 @@ export function SalesPage(): JSX.Element {
           to: range.to,
           paymentType,
           search: debouncedSearch || undefined,
-          limit: 500
+          limit: paging.limit,
+          offset: paging.offset
         })
       ),
-    [range.from, range.to, paymentType, debouncedSearch]
+    [range.from, range.to, paymentType, debouncedSearch, paging.offset, paging.limit]
   )
 
   const summary = useQuery(() => unwrap(api.reports.salesSummary(range)), [range.from, range.to])
@@ -61,7 +65,11 @@ export function SalesPage(): JSX.Element {
   )
 
   const rows = sales.data?.rows ?? []
-  const onKhata = rows.reduce((sum, sale) => sum + Math.max(0, sale.total - sale.paidAmount), 0)
+  const total = sales.data?.total ?? 0
+  // Summed by the server over every bill the filters match. The tile has to
+  // describe the whole period, not whichever page happens to be open.
+  const onKhata = sales.data?.totals.onKhata ?? 0
+  const page = useClampedPage(paging, total)
 
   const columns: Column<Sale>[] = [
     {
@@ -169,7 +177,7 @@ export function SalesPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid min={190}>
           <StatTile
             label="Sales"
@@ -217,6 +225,13 @@ export function SalesPage(): JSX.Element {
                   </Button>
                 )
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={total}
+              onPageChange={paging.setPage}
+              noun="bills"
             />
           </CardBody>
         </Card>

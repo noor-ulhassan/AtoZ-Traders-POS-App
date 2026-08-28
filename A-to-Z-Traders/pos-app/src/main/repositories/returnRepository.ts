@@ -1,16 +1,18 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   PurchaseReturn,
   PurchaseReturnItem,
   RefundType,
   ReturnFilters,
+  ReturnPageTotals,
   SaleReturn,
   SaleReturnItem
 } from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
-import { toText } from '../db/rows'
+import { fromBool, toBool, toText } from '../db/rows'
 
 // ------------------------------------------------------------ sale returns
 
@@ -22,6 +24,7 @@ interface SaleReturnRow {
   customer_name: string | null
   date: string
   total: number
+  other_total: number
   refund_type: RefundType
   notes: string | null
   created_at: string
@@ -38,6 +41,7 @@ interface SaleReturnItemRow {
   base_qty: number
   rate: number
   cost_price: number
+  is_other: number
   amount: number
 }
 
@@ -49,6 +53,7 @@ const toSaleReturn = (row: SaleReturnRow): SaleReturn => ({
   customerName: row.customer_name,
   date: row.date,
   total: row.total,
+  otherTotal: row.other_total,
   refundType: row.refund_type,
   notes: toText(row.notes),
   createdAt: row.created_at
@@ -88,9 +93,12 @@ function buildFilter(
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listSaleReturns(db: Db, filters: ReturnFilters = {}): Page<SaleReturn> {
+export function listSaleReturns(
+  db: Db,
+  filters: ReturnFilters = {}
+): PageWithTotals<SaleReturn, ReturnPageTotals> {
   const { where, params } = buildFilter(filters, 'customer_id', 'sr')
-  const limit = filters.limit ?? 100
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -99,11 +107,23 @@ export function listSaleReturns(db: Db, filters: ReturnFilters = {}): Page<SaleR
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(`SELECT COUNT(*) AS total FROM sale_returns sr ${where}`)
+  const summary = db
+    .prepare<unknown[], { total: number; sum_total: number | null; cash: number | null }>(
+      `SELECT COUNT(*)     AS total,
+              SUM(sr.total) AS sum_total,
+              SUM(CASE WHEN sr.refund_type = 'cash' THEN sr.total END) AS cash
+         FROM sale_returns sr ${where}`
+    )
     .get(...params)
 
-  return { rows: rows.map(toSaleReturn), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toSaleReturn),
+    total: summary?.total ?? 0,
+    totals: {
+      total: money(summary?.sum_total ?? 0),
+      cashRefunds: money(summary?.cash ?? 0)
+    }
+  }
 }
 
 export function findSaleReturn(db: Db, id: Id): SaleReturn | null {
@@ -132,6 +152,7 @@ export function listSaleReturnItems(db: Db, saleReturnId: Id): SaleReturnItem[] 
       baseQty: row.base_qty,
       rate: row.rate,
       costPrice: row.cost_price,
+      isOther: toBool(row.is_other),
       amount: row.amount
     }))
 }
@@ -143,20 +164,24 @@ export function insertSaleReturn(
     customerId: Id | null
     date: string
     total: number
+    /** The part of `total` that was consignment stock. */
+    otherTotal: number
     refundType: RefundType
     notes: string | null
   }
 ): Id {
   const info = db
     .prepare(
-      `INSERT INTO sale_returns (sale_id, customer_id, date, total, refund_type, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO sale_returns
+         (sale_id, customer_id, date, total, other_total, refund_type, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.saleId,
       fields.customerId,
       fields.date,
       money(fields.total),
+      money(fields.otherTotal),
       fields.refundType,
       fields.notes
     )
@@ -174,13 +199,15 @@ export function insertSaleReturnItem(
     baseQty: number
     rate: number
     costPrice: number
+    isOther: boolean
     amount: number
   }
 ): void {
   db.prepare(
     `INSERT INTO sale_return_items
-       (sale_return_id, product_id, unit_name, factor, qty, base_qty, rate, cost_price, amount)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (sale_return_id, product_id, unit_name, factor, qty, base_qty, rate,
+        cost_price, is_other, amount)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     fields.saleReturnId,
     fields.productId,
@@ -190,6 +217,7 @@ export function insertSaleReturnItem(
     qty(fields.baseQty),
     money(fields.rate),
     money(fields.costPrice),
+    fromBool(fields.isOther),
     money(fields.amount)
   )
 }
@@ -302,9 +330,12 @@ const SELECT_PURCHASE_RETURN = `
     LEFT JOIN suppliers s ON s.id = pr.supplier_id
 `
 
-export function listPurchaseReturns(db: Db, filters: ReturnFilters = {}): Page<PurchaseReturn> {
+export function listPurchaseReturns(
+  db: Db,
+  filters: ReturnFilters = {}
+): PageWithTotals<PurchaseReturn, ReturnPageTotals> {
   const { where, params } = buildFilter(filters, 'supplier_id', 'pr')
-  const limit = filters.limit ?? 100
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -313,13 +344,19 @@ export function listPurchaseReturns(db: Db, filters: ReturnFilters = {}): Page<P
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(
-      `SELECT COUNT(*) AS total FROM purchase_returns pr ${where}`
+  const summary = db
+    .prepare<unknown[], { total: number; sum_total: number | null }>(
+      `SELECT COUNT(*) AS total, SUM(pr.total) AS sum_total FROM purchase_returns pr ${where}`
     )
     .get(...params)
 
-  return { rows: rows.map(toPurchaseReturn), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toPurchaseReturn),
+    total: summary?.total ?? 0,
+    // Goods returned to a supplier reduce a payable; there is no cash refund
+    // to report, so the field stays 0 rather than pretending to a number.
+    totals: { total: money(summary?.sum_total ?? 0), cashRefunds: 0 }
+  }
 }
 
 export function findPurchaseReturn(db: Db, id: Id): PurchaseReturn | null {

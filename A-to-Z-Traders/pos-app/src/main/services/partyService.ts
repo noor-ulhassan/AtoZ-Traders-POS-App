@@ -1,9 +1,10 @@
 import type {
   Customer,
   Id,
-  Page,
+  PageWithTotals,
   PartyFilters,
   PartyInput,
+  PartyPageTotals,
   PartyType,
   Supplier
 } from '@shared/types'
@@ -14,7 +15,10 @@ import { businessRule, notFound } from '../utils/errors'
 
 const LABEL: Record<PartyType, string> = { customer: 'Customer', supplier: 'Supplier' }
 
-export function listParties(type: PartyType, filters: PartyFilters = {}): Page<Customer> {
+export function listParties(
+  type: PartyType,
+  filters: PartyFilters = {}
+): PageWithTotals<Customer, PartyPageTotals> {
   return parties.listParties(getDb(), type, filters)
 }
 
@@ -89,14 +93,16 @@ function hasTransactions(db: Db, type: PartyType, id: Id): boolean {
 }
 
 export const customers = {
-  list: (filters?: PartyFilters): Page<Customer> => listParties('customer', filters),
+  list: (filters?: PartyFilters): PageWithTotals<Customer, PartyPageTotals> =>
+    listParties('customer', filters),
   get: (id: Id): Customer => getParty('customer', id),
   add: (input: PartyInput): Customer => addParty('customer', input),
   update: (id: Id, input: PartyInput): Customer => updateParty('customer', id, input)
 }
 
 export const suppliers = {
-  list: (filters?: PartyFilters): Page<Supplier> => listParties('supplier', filters),
+  list: (filters?: PartyFilters): PageWithTotals<Supplier, PartyPageTotals> =>
+    listParties('supplier', filters),
   get: (id: Id): Supplier => getParty('supplier', id),
   add: (input: PartyInput): Supplier => addParty('supplier', input),
   update: (id: Id, input: PartyInput): Supplier => updateParty('supplier', id, input)

@@ -1,9 +1,10 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Purchase,
   PurchaseFilters,
   PurchaseInput,
+  PurchasePageTotals,
   PurchaseWithItems
 } from '@shared/types'
 import { today } from '@shared/date'
@@ -17,7 +18,9 @@ import { recordMovement, weightedAverageCost } from './inventoryService'
 import { requireParty } from './partyService'
 import { requireProduct, resolveUnit } from './productService'
 
-export function listPurchases(filters: PurchaseFilters = {}): Page<Purchase> {
+export function listPurchases(
+  filters: PurchaseFilters = {}
+): PageWithTotals<Purchase, PurchasePageTotals> {
   return purchases.listPurchases(getDb(), filters)
 }
 
@@ -54,6 +57,16 @@ export function createPurchase(input: PurchaseInput): PurchaseWithItems {
 
     if (baseQty <= 0) {
       throw businessRule(`Quantity for "${product.name}" must be more than zero.`)
+    }
+
+    // A purchase pays a supplier and sets a weighted-average cost. Consignment
+    // goods are neither bought nor owed for, so they arrive through the other
+    // stock register instead — putting them on a purchase would invent a
+    // payable and a cost that do not exist.
+    if (product.ownership === 'other') {
+      throw businessRule(
+        `"${product.name}" belongs to ${product.ownerName}. Record it under Other stock, not as a purchase.`
+      )
     }
 
     // Cost is entered per chosen unit; the database stores it per base unit.

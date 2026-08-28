@@ -15,6 +15,7 @@ interface SettingsRow {
   logo_path: string
   currency: string
   auto_backup_dir: string
+  backup_interval_minutes: number
 }
 
 /** Maps `Settings` keys to their column names — the only place the two meet. */
@@ -30,7 +31,8 @@ const COLUMNS: Record<keyof Settings, keyof SettingsRow> = {
   receiptFooter: 'receipt_footer',
   logoPath: 'logo_path',
   currency: 'currency',
-  autoBackupDir: 'auto_backup_dir'
+  autoBackupDir: 'auto_backup_dir',
+  backupIntervalMinutes: 'backup_interval_minutes'
 }
 
 function toSettings(row: SettingsRow): Settings {
@@ -46,7 +48,8 @@ function toSettings(row: SettingsRow): Settings {
     receiptFooter: row.receipt_footer,
     logoPath: row.logo_path,
     currency: row.currency,
-    autoBackupDir: row.auto_backup_dir
+    autoBackupDir: row.auto_backup_dir,
+    backupIntervalMinutes: row.backup_interval_minutes
   }
 }
 

@@ -1,7 +1,16 @@
 import type { Id, IsoDate, IsoTimestamp } from './common'
 
 export type StockMovementReason =
-  'opening' | 'purchase' | 'sale' | 'sale_return' | 'purchase_return' | 'adjustment'
+  | 'opening'
+  | 'purchase'
+  | 'sale'
+  | 'sale_return'
+  | 'purchase_return'
+  | 'adjustment'
+  /** Consignment goods arriving from their owner. No money moves. */
+  | 'other_in'
+  /** Unsold consignment goods going back to their owner. */
+  | 'other_out'
 
 export interface StockMovement {
   id: Id

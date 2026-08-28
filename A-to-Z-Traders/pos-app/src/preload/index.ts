@@ -69,12 +69,23 @@ const api = {
     units: {
       list: (productId) => invoke(IPC_CHANNELS.productsUnitsList, { productId }),
       set: (productId, units) => invoke(IPC_CHANNELS.productsUnitsSet, { productId, units })
+    },
+    import: {
+      preview: () => invoke(IPC_CHANNELS.productsImportPreview),
+      commit: (token) => invoke(IPC_CHANNELS.productsImportCommit, { token })
     }
   },
 
   stock: {
     adjust: (input) => invoke(IPC_CHANNELS.stockAdjust, input),
     movements: (filters) => invoke(IPC_CHANNELS.stockMovements, filters)
+  },
+
+  otherStock: {
+    report: (filters) => invoke(IPC_CHANNELS.otherStockReport, filters),
+    owners: () => invoke(IPC_CHANNELS.otherStockOwners),
+    receive: (input) => invoke(IPC_CHANNELS.otherStockReceive, input),
+    sendBack: (input) => invoke(IPC_CHANNELS.otherStockReturn, input)
   },
 
   customers: {
@@ -157,8 +168,18 @@ const api = {
 
   backup: {
     now: () => invoke(IPC_CHANNELS.backupNow),
+    runNow: () => invoke(IPC_CHANNELS.backupRunNow),
     restore: () => invoke(IPC_CHANNELS.backupRestore),
-    info: () => invoke(IPC_CHANNELS.backupInfo)
+    restoreFrom: (path) => invoke(IPC_CHANNELS.backupRestoreFrom, { path }),
+    info: () => invoke(IPC_CHANNELS.backupInfo),
+    status: () => invoke(IPC_CHANNELS.backupStatus),
+    list: () => invoke(IPC_CHANNELS.backupList)
+  },
+
+  demo: {
+    status: () => invoke(IPC_CHANNELS.demoStatus),
+    seed: () => invoke(IPC_CHANNELS.demoSeed),
+    clear: () => invoke(IPC_CHANNELS.demoClear)
   },
 
   printing: {

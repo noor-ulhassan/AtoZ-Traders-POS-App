@@ -1,12 +1,14 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Product,
   ProductFilters,
+  ProductPageTotals,
   ProductInput,
   ProductUnit,
   ProductUnitInput,
   ProductWithUnits,
+  Ownership,
   SellableUnit
 } from '@shared/types'
 import { today } from '@shared/date'
@@ -17,7 +19,37 @@ import * as products from '../repositories/productRepository'
 import * as stock from '../repositories/stockRepository'
 import { businessRule, conflict, notFound } from '../utils/errors'
 
-export function listProducts(filters: ProductFilters = {}): Page<Product> {
+/**
+ * Resolves the ownership half of a product's identity.
+ *
+ * Consignment goods need a name to settle up with, so 'other' without an owner
+ * is refused rather than saved as an anonymous liability. Own stock never
+ * carries an owner name, so switching back clears it instead of leaving a stale
+ * one behind to confuse a later report.
+ *
+ * `existing` is what the product is today, and both fields fall back to it.
+ * That matters on update: an omitted `ownership` has to mean "leave it alone",
+ * never "make it mine" — otherwise a caller that simply does not know about
+ * consignment could quietly annex somebody else's goods, and an owner name
+ * would have to be re-typed on every unrelated edit.
+ */
+function resolveOwnership(
+  input: ProductInput,
+  existing?: { ownership: Ownership; ownerName: string }
+): { ownership: Ownership; ownerName: string } {
+  const ownership = input.ownership ?? existing?.ownership ?? 'own'
+  if (ownership !== 'other') return { ownership: 'own', ownerName: '' }
+
+  const ownerName = (input.ownerName ?? existing?.ownerName ?? '').trim()
+  if (ownerName === '') {
+    throw businessRule('Other stock needs the name of whoever the goods belong to.')
+  }
+  return { ownership: 'other', ownerName }
+}
+
+export function listProducts(
+  filters: ProductFilters = {}
+): PageWithTotals<Product, ProductPageTotals> {
   return products.listProducts(getDb(), filters)
 }
 
@@ -58,6 +90,13 @@ export function addProduct(input: ProductInput): Product {
   const units = input.units ?? []
   assertUnitsAreSane(input.baseUnit, units)
 
+  const { ownership, ownerName } = resolveOwnership(input)
+
+  // Consignment goods were not bought, so there is no cost to carry and nothing
+  // for a cost to mean. Forcing it to zero here is what keeps every profit and
+  // valuation figure downstream honest without each of them having to know.
+  const costPrice = ownership === 'other' ? 0 : input.costPrice
+
   const create = db.transaction(() => {
     const id = products.insertProduct(db, {
       name: input.name,
@@ -65,10 +104,12 @@ export function addProduct(input: ProductInput): Product {
       barcode: input.barcode ?? null,
       categoryId: input.categoryId ?? null,
       baseUnit: input.baseUnit,
-      costPrice: input.costPrice,
+      costPrice,
       salePrice: input.salePrice,
       reorderLevel: input.reorderLevel,
-      isActive: input.isActive ?? true
+      isActive: input.isActive ?? true,
+      ownership,
+      ownerName
     })
 
     if (units.length > 0) products.replaceUnits(db, id, units)
@@ -80,10 +121,10 @@ export function addProduct(input: ProductInput): Product {
       stock.insertMovement(db, {
         productId: id,
         changeQty: opening,
-        reason: 'opening',
+        reason: ownership === 'other' ? 'other_in' : 'opening',
         refTable: 'products',
         refId: id,
-        costPrice: input.costPrice,
+        costPrice,
         date: today(),
         notes: 'Opening stock'
       })
@@ -116,6 +157,19 @@ export function updateProduct(id: Id, input: ProductInput): Product {
     }
   }
 
+  const { ownership, ownerName } = resolveOwnership(input, existing)
+
+  // Whose goods these are decides whether the shelf holds an asset or someone
+  // else's property. Flipping that while stock is on the shelf would move a
+  // quantity between the two worlds with no record of it, so it waits until
+  // there is nothing to move. Past bills are unaffected either way: each line
+  // froze the answer at the moment it was sold.
+  if (ownership !== existing.ownership && existing.stockQty !== 0) {
+    throw businessRule(
+      `"${existing.name}" still has ${existing.stockQty} ${existing.baseUnit} in stock. Clear the stock before changing who the goods belong to.`
+    )
+  }
+
   const run = db.transaction(() => {
     products.updateProduct(db, id, {
       name: input.name,
@@ -124,11 +178,15 @@ export function updateProduct(id: Id, input: ProductInput): Product {
       categoryId: input.categoryId ?? null,
       baseUnit: input.baseUnit,
       // Cost price is owned by the purchase flow's weighted average; the form
-      // may only set it while the product has never been purchased.
-      costPrice: existing.stockQty === 0 ? input.costPrice : existing.costPrice,
+      // may only set it while the product has never been purchased. Consignment
+      // goods have no cost at all.
+      costPrice:
+        ownership === 'other' ? 0 : existing.stockQty === 0 ? input.costPrice : existing.costPrice,
       salePrice: input.salePrice,
       reorderLevel: input.reorderLevel,
-      isActive: input.isActive ?? existing.isActive
+      isActive: input.isActive ?? existing.isActive,
+      ownership,
+      ownerName
     })
     products.replaceUnits(db, id, units)
   })

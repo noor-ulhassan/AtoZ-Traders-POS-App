@@ -50,6 +50,9 @@ export function translateSqliteError(error: unknown): AppError | null {
     if (error.message.includes('products.sku')) {
       return conflict('Another product already uses this SKU.')
     }
+    if (error.message.includes('products.barcode')) {
+      return conflict('Another product already uses this barcode.')
+    }
     if (error.message.includes('sales.invoice_no')) {
       return conflict('That invoice number already exists. Please try saving again.')
     }

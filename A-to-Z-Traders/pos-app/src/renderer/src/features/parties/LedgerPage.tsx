@@ -140,7 +140,7 @@ export function LedgerPage({ partyType }: LedgerPageProps): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid min={200}>
           <StatTile
             label="Current balance"

@@ -3,8 +3,9 @@ import type {
   ExpenseCategory,
   ExpenseFilters,
   ExpenseInput,
+  ExpensePageTotals,
   Id,
-  Page
+  PageWithTotals
 } from '@shared/types'
 import { today } from '@shared/date'
 import { getDb } from '../db/connection'
@@ -21,7 +22,9 @@ export function addExpenseCategory(name: string): ExpenseCategory {
   return expenses.findExpenseCategory(db, id) as ExpenseCategory
 }
 
-export function listExpenses(filters: ExpenseFilters = {}): Page<Expense> {
+export function listExpenses(
+  filters: ExpenseFilters = {}
+): PageWithTotals<Expense, ExpensePageTotals> {
   return expenses.listExpenses(getDb(), filters)
 }
 

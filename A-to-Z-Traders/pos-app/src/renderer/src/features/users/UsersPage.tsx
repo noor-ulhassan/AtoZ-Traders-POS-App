@@ -80,7 +80,9 @@ export function UsersPage(): JSX.Element {
       header: 'Added',
       width: '140px',
       render: (user) => (
-        <span style={{ color: 'var(--ink-muted)' }}>{format.date(user.createdAt.slice(0, 10))}</span>
+        <span style={{ color: 'var(--ink-muted)' }}>
+          {format.date(user.createdAt.slice(0, 10))}
+        </span>
       )
     },
     {
@@ -121,9 +123,7 @@ export function UsersPage(): JSX.Element {
     <>
       <PageHeader
         title="Staff & roles"
-        subtitle={
-          users.data ? `${format.pluralize(rows.length, 'staff account')}` : 'Loading'
-        }
+        subtitle={users.data ? `${format.pluralize(rows.length, 'staff account')}` : 'Loading'}
         actions={
           <Button variant="primary" icon="plus" onClick={() => setIsAdding(true)}>
             Add staff
@@ -131,7 +131,7 @@ export function UsersPage(): JSX.Element {
         }
       />
 
-      <PageBody>
+      <PageBody fill>
         <Card>
           <CardBody flush>
             <DataTable
@@ -183,14 +183,17 @@ function StaffFormModal({
   const [confirmPin, setConfirmPin] = useState('')
   const [touched, setTouched] = useState(false)
 
-  const save = useMutation(async () => unwrap(api.users.create({ username: username.trim(), pin })), {
-    successMessage: 'Staff account created',
-    errorTitle: 'Could not create the account',
-    onSuccess: () => {
-      onSaved()
-      onClose()
+  const save = useMutation(
+    async () => unwrap(api.users.create({ username: username.trim(), pin })),
+    {
+      successMessage: 'Staff account created',
+      errorTitle: 'Could not create the account',
+      onSuccess: () => {
+        onSaved()
+        onClose()
+      }
     }
-  })
+  )
 
   const localPinError = touched ? pinProblem(pin, confirmPin) : null
   const canSave =

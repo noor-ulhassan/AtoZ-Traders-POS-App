@@ -7,7 +7,6 @@ import { Checkbox, Field, Input, NumberInput, Textarea } from '../../components/
 import { Callout } from '../../components/ui/Feedback'
 import { Card, CardBody, CardHeader, FormGrid, GridCell } from '../../components/ui/Surface'
 import { PageBody, PageHeader } from '../../components/layout/PageHeader'
-import { useConfirm } from '../../components/ui/Confirm'
 import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
 import { useToast } from '../../components/ui/Toast'
@@ -15,6 +14,8 @@ import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useSettings } from '../../app/SettingsContext'
 import { ChangePasswordModal } from '../auth/ChangePasswordModal'
+import { BackupPanel } from './BackupPanel'
+import { DemoDataPanel } from './DemoDataPanel'
 
 interface InfoRowProps {
   label: string
@@ -47,7 +48,6 @@ function InfoRow({ label, mono, selectable, children }: InfoRowProps): JSX.Eleme
 
 export function SettingsPage(): JSX.Element {
   const { settings, save: persist } = useSettings()
-  const confirm = useConfirm()
   const toast = useToast()
 
   // Seeded from context, then kept in step by `persist` — saving updates both
@@ -65,38 +65,23 @@ export function SettingsPage(): JSX.Element {
     successMessage: 'Settings saved'
   })
 
-  const backupNow = useMutation(async () => unwrap(api.backup.now()), {
-    errorTitle: 'Backup failed',
-    onSuccess: (result) => {
-      if (!result) return
-      toast.success('Backup saved', `${result.path} (${format.fileSize(result.size)})`)
-      info.refetch()
-    }
-  })
+  /**
+   * Adding or removing sample data rewrites what every screen is showing, so
+   * the honest response is the same one a restore gets: reload, and let the
+   * whole app read the database again.
+   */
+  const reloadAfterDataChange = (): void => {
+    setTimeout(() => window.location.reload(), 1200)
+  }
 
-  const restore = useMutation(async () => unwrap(api.backup.restore()), {
-    errorTitle: 'Restore failed',
-    onSuccess: (result) => {
-      if (!result) return
-      toast.success(
-        'Data restored',
-        `Your previous data was kept at ${result.safetyCopyPath}. Reloading the app now.`
-      )
-      // Everything on screen is now describing a database that no longer
-      // exists, so the safest next step is a clean reload.
-      setTimeout(() => window.location.reload(), 1200)
-    }
-  })
-
-  const askRestore = async (): Promise<void> => {
-    const ok = await confirm({
-      title: 'Restore from a backup?',
-      message:
-        'This replaces everything currently in the app with the contents of the backup file you choose. A copy of your current data is kept, and you will be asked to confirm once more.',
-      confirmLabel: 'Choose a backup file',
-      destructive: true
-    })
-    if (ok) await restore.run()
+  const onRestored = (safetyCopyPath: string): void => {
+    toast.success(
+      'Data restored',
+      `Your previous data was kept at ${safetyCopyPath}. Reloading the app now.`
+    )
+    // Everything on screen is now describing a database that no longer exists,
+    // so the safest next step is a clean reload.
+    setTimeout(() => window.location.reload(), 1200)
   }
 
   return (
@@ -246,51 +231,9 @@ export function SettingsPage(): JSX.Element {
           </div>
 
           <div className="flex flex-col gap-5">
-            <Card>
-              <CardHeader
-                title="Backups"
-                subtitle="Everything lives in one file on this computer"
-              />
-              <CardBody>
-                <Callout tone="warn" title="Keep a copy somewhere else">
-                  If this computer fails, a backup on a USB drive or another folder is the only way
-                  your records survive. Take one at the end of every day.
-                </Callout>
+            <BackupPanel form={form} set={set} isDirty={isDirty} onRestored={onRestored} />
 
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    variant="primary"
-                    icon="backup"
-                    loading={backupNow.isPending}
-                    onClick={() => void backupNow.run()}
-                  >
-                    Back up now
-                  </Button>
-                  <Button
-                    variant="danger"
-                    icon="restore"
-                    loading={restore.isPending}
-                    onClick={() => void askRestore()}
-                  >
-                    Restore
-                  </Button>
-                </div>
-
-                <div className="mt-5">
-                  <Field
-                    label="Automatic backup folder"
-                    hint="Leave empty to turn off. A copy is written here each time you close the app."
-                  >
-                    <Input
-                      className="font-mono"
-                      value={form.autoBackupDir}
-                      placeholder="D:\POS-backups"
-                      onChange={(event) => set('autoBackupDir', event.target.value)}
-                    />
-                  </Field>
-                </div>
-              </CardBody>
-            </Card>
+            <DemoDataPanel onChanged={reloadAfterDataChange} />
 
             <Card>
               <CardHeader title="Security" subtitle="The admin password that locks this app" />

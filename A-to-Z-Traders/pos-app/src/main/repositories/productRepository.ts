@@ -1,13 +1,16 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Product,
   ProductFilters,
+  ProductPageTotals,
   ProductUnit,
   ProductUnitInput,
+  Ownership,
   SellableUnit
 } from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toBool, toText } from '../db/rows'
 
@@ -24,6 +27,8 @@ interface ProductRow {
   stock_qty: number
   reorder_level: number
   is_active: number
+  ownership: 'own' | 'other'
+  owner_name: string
   created_at: string
   updated_at: string
 }
@@ -49,6 +54,8 @@ const toProduct = (row: ProductRow): Product => ({
   stockQty: row.stock_qty,
   reorderLevel: row.reorder_level,
   isActive: toBool(row.is_active),
+  ownership: row.ownership,
+  ownerName: row.owner_name,
   createdAt: row.created_at,
   updatedAt: row.updated_at
 })
@@ -91,12 +98,21 @@ function buildFilter(filters: ProductFilters): { where: string; params: unknown[
     clauses.push('p.reorder_level > 0 AND p.stock_qty <= p.reorder_level')
   }
 
+  const ownership = filters.ownership ?? 'all'
+  if (ownership !== 'all') {
+    clauses.push('p.ownership = ?')
+    params.push(ownership)
+  }
+
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listProducts(db: Db, filters: ProductFilters = {}): Page<Product> {
+export function listProducts(
+  db: Db,
+  filters: ProductFilters = {}
+): PageWithTotals<Product, ProductPageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 200
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -105,11 +121,20 @@ export function listProducts(db: Db, filters: ProductFilters = {}): Page<Product
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(`SELECT COUNT(*) AS total FROM products p ${where}`)
+  // One pass for the count and the money, over the same WHERE the rows used —
+  // so the tiles above the table describe every match, not the page on screen.
+  const summary = db
+    .prepare<unknown[], { total: number; stock_value: number | null }>(
+      `SELECT COUNT(*) AS total, SUM(p.stock_qty * p.cost_price) AS stock_value
+         FROM products p ${where}`
+    )
     .get(...params)
 
-  return { rows: rows.map(toProduct), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toProduct),
+    total: summary?.total ?? 0,
+    totals: { stockValue: money(summary?.stock_value ?? 0) }
+  }
 }
 
 export function findProduct(db: Db, id: Id): Product | null {
@@ -134,14 +159,17 @@ export interface ProductWriteFields {
   salePrice: number
   reorderLevel: number
   isActive: boolean
+  ownership: Ownership
+  ownerName: string
 }
 
 export function insertProduct(db: Db, fields: ProductWriteFields): Id {
   const info = db
     .prepare(
       `INSERT INTO products
-         (name, sku, barcode, category_id, base_unit, cost_price, sale_price, reorder_level, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, sku, barcode, category_id, base_unit, cost_price, sale_price,
+          reorder_level, is_active, ownership, owner_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.name,
@@ -152,7 +180,9 @@ export function insertProduct(db: Db, fields: ProductWriteFields): Id {
       money(fields.costPrice),
       money(fields.salePrice),
       qty(fields.reorderLevel),
-      fields.isActive ? 1 : 0
+      fields.isActive ? 1 : 0,
+      fields.ownership,
+      fields.ownerName
     )
   return Number(info.lastInsertRowid)
 }
@@ -162,6 +192,7 @@ export function updateProduct(db: Db, id: Id, fields: ProductWriteFields): void 
     `UPDATE products
         SET name = ?, sku = ?, barcode = ?, category_id = ?, base_unit = ?,
             cost_price = ?, sale_price = ?, reorder_level = ?, is_active = ?,
+            ownership = ?, owner_name = ?,
             updated_at = datetime('now','localtime')
       WHERE id = ?`
   ).run(
@@ -174,6 +205,8 @@ export function updateProduct(db: Db, id: Id, fields: ProductWriteFields): void 
     money(fields.salePrice),
     qty(fields.reorderLevel),
     fields.isActive ? 1 : 0,
+    fields.ownership,
+    fields.ownerName,
     id
   )
 }

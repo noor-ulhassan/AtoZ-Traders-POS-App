@@ -1,5 +1,14 @@
-import type { Customer, Id, Page, PartyFilters, PartyType, Supplier } from '@shared/types'
+import type {
+  Customer,
+  Id,
+  PageWithTotals,
+  PartyFilters,
+  PartyPageTotals,
+  PartyType,
+  Supplier
+} from '@shared/types'
 import { money } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toText } from '../db/rows'
 
@@ -49,10 +58,14 @@ function buildFilter(filters: PartyFilters): { where: string; params: unknown[] 
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listParties(db: Db, type: PartyType, filters: PartyFilters = {}): Page<Customer> {
+export function listParties(
+  db: Db,
+  type: PartyType,
+  filters: PartyFilters = {}
+): PageWithTotals<Customer, PartyPageTotals> {
   const table = TABLES[type]
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 200
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -61,11 +74,20 @@ export function listParties(db: Db, type: PartyType, filters: PartyFilters = {})
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(`SELECT COUNT(*) AS total FROM ${table} ${where}`)
+  // Only positive balances are summed: a customer in credit does not reduce
+  // what the rest of them owe, and netting the two would understate the debt.
+  const summary = db
+    .prepare<unknown[], { total: number; outstanding: number | null }>(
+      `SELECT COUNT(*) AS total, SUM(MAX(0, current_balance)) AS outstanding
+         FROM ${table} ${where}`
+    )
     .get(...params)
 
-  return { rows: rows.map(toParty), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toParty),
+    total: summary?.total ?? 0,
+    totals: { outstanding: money(summary?.outstanding ?? 0) }
+  }
 }
 
 export function findParty(db: Db, type: PartyType, id: Id): Customer | null {

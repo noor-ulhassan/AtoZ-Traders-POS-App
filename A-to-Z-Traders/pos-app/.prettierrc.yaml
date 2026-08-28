@@ -2,3 +2,8 @@ singleQuote: true
 semi: false
 printWidth: 100
 trailingComma: none
+# The working tree is CRLF on Windows and LF elsewhere, and git normalises on
+# commit either way. Prettier's default of 'lf' therefore flagged a line ending
+# on every line of every file: tens of thousands of warnings that buried the
+# real ones. 'auto' takes each file as it finds it.
+endOfLine: auto

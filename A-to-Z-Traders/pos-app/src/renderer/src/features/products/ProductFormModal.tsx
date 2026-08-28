@@ -1,8 +1,9 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
-import type { Category, ProductUnitInput, ProductWithUnits } from '@shared/types'
+import type { Category, Ownership, ProductUnitInput, ProductWithUnits } from '@shared/types'
 import { Button } from '../../components/ui/Button'
 import { Field, Input, NumberInput, Select } from '../../components/ui/Field'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Callout } from '../../components/ui/Feedback'
 import { Modal } from '../../components/ui/Modal'
 import { FormGrid, GridCell, SectionLabel } from '../../components/ui/Surface'
@@ -29,6 +30,8 @@ interface FormState {
   salePrice: number
   reorderLevel: number
   openingStock: number
+  ownership: Ownership
+  ownerName: string
   units: ProductUnitInput[]
 }
 
@@ -42,6 +45,8 @@ const EMPTY: FormState = {
   salePrice: 0,
   reorderLevel: 0,
   openingStock: 0,
+  ownership: 'own',
+  ownerName: '',
   units: []
 }
 
@@ -74,6 +79,8 @@ function toFormState(product: ProductWithUnits | null): FormState {
     salePrice: product.salePrice,
     reorderLevel: product.reorderLevel,
     openingStock: 0,
+    ownership: product.ownership,
+    ownerName: product.ownerName,
     units: product.units.map((unit) => ({
       unitName: unit.unitName,
       factor: unit.factor,
@@ -111,6 +118,8 @@ export function ProductFormModal({
         costPrice: form.costPrice,
         salePrice: form.salePrice,
         reorderLevel: form.reorderLevel,
+        ownership: form.ownership,
+        ownerName: form.ownerName || null,
         units: form.units,
         ...(isEditing ? {} : { openingStock: form.openingStock })
       }
@@ -128,14 +137,22 @@ export function ProductFormModal({
     }
   )
 
+  const isOther = form.ownership === 'other'
+
   // Once a product has been purchased, its cost belongs to the weighted
-  // average and a form must not overwrite it.
-  const costIsLocked = isEditing && product.stockQty !== 0
+  // average and a form must not overwrite it. Consignment goods have no cost at
+  // all — the shop never bought them.
+  const costIsLocked = (isEditing && product.stockQty !== 0) || isOther
+
+  // Whose goods these are decides whether the shelf holds an asset or somebody
+  // else's property, so it cannot be flipped with stock still on it.
+  const ownershipIsLocked = isEditing && product.stockQty !== 0
 
   // Opening stock carries a cost: without one, every sale of that stock reports
   // pure profit (COGS of zero). We warn rather than block, because stock that
   // really was free is a valid case and 100% profit is then the honest number.
-  const openingStockHasNoCost = !isEditing && form.openingStock > 0 && form.costPrice <= 0
+  const openingStockHasNoCost =
+    !isEditing && !isOther && form.openingStock > 0 && form.costPrice <= 0
 
   return (
     <Modal
@@ -218,20 +235,77 @@ export function ProductFormModal({
           </Field>
         </GridCell>
 
+        <GridCell span={12}>
+          <SectionLabel>Whose goods are these</SectionLabel>
+        </GridCell>
+
+        <GridCell span={6}>
+          <SegmentedControl
+            label="Whose goods are these"
+            fullWidth
+            value={form.ownership}
+            onChange={(value) => set('ownership', value)}
+            options={[
+              {
+                value: 'own',
+                label: 'My own stock',
+                disabled: ownershipIsLocked,
+                title: ownershipIsLocked ? 'Clear the stock first' : undefined
+              },
+              {
+                value: 'other',
+                label: 'Other stock',
+                disabled: ownershipIsLocked,
+                title: ownershipIsLocked ? 'Clear the stock first' : undefined
+              }
+            ]}
+          />
+        </GridCell>
+
+        {isOther && (
+          <GridCell span={6}>
+            <Field
+              label="Belongs to"
+              required
+              hint="Who you settle up with for these goods"
+              error={save.errors['input.ownerName']}
+            >
+              <Input
+                value={form.ownerName}
+                onChange={(event) => set('ownerName', event.target.value)}
+                placeholder="e.g. Bilal Electronics"
+                invalid={Boolean(save.errors['input.ownerName'])}
+              />
+            </Field>
+          </GridCell>
+        )}
+
+        {isOther && (
+          <GridCell span={12}>
+            <Callout tone="info" title="Sold on someone else’s behalf">
+              These goods are billed and counted like anything else, but they are kept out of your
+              cost, profit and stock value — the margin on them is not yours. Track what you owe on
+              the Other stock screen.
+            </Callout>
+          </GridCell>
+        )}
+
         <GridCell span={4}>
           <Field
             label={`Cost price per ${form.baseUnit || 'unit'}`}
             hint={
-              costIsLocked
-                ? 'Set by purchases (weighted average)'
-                : isEditing
-                  ? 'Updated automatically as you buy stock'
-                  : 'The cost of your opening stock. Purchases update it automatically after that.'
+              isOther
+                ? 'Not yours to cost — these goods were never bought'
+                : costIsLocked
+                  ? 'Set by purchases (weighted average)'
+                  : isEditing
+                    ? 'Updated automatically as you buy stock'
+                    : 'The cost of your opening stock. Purchases update it automatically after that.'
             }
           >
             <NumberInput
               prefix={currency}
-              value={form.costPrice}
+              value={isOther ? 0 : form.costPrice}
               onValueChange={(value) => set('costPrice', value)}
               disabled={costIsLocked}
             />
@@ -264,7 +338,10 @@ export function ProductFormModal({
 
         {!isEditing && (
           <GridCell span={4}>
-            <Field label="Opening stock" hint={`In ${form.baseUnit || 'base units'}`}>
+            <Field
+              label={isOther ? 'Received from owner' : 'Opening stock'}
+              hint={`In ${form.baseUnit || 'base units'}`}
+            >
               <NumberInput
                 value={form.openingStock}
                 onValueChange={(value) => set('openingStock', value)}

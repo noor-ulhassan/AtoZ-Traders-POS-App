@@ -5,10 +5,11 @@ import { resolvePreset } from '@shared/date'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell, TablePager } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -20,16 +21,27 @@ export function SaleReturnsPage(): JSX.Element {
   const [range, setRange] = useState<DateRange>(() => resolvePreset('last30'))
   const [isFormOpen, setIsFormOpen] = useState(false)
 
+  const paging = usePagination([range.from, range.to])
+
   const returns = useQuery(
-    () => unwrap(api.returns.sale.list({ from: range.from, to: range.to, limit: 300 })),
-    [range.from, range.to]
+    () =>
+      unwrap(
+        api.returns.sale.list({
+          from: range.from,
+          to: range.to,
+          limit: paging.limit,
+          offset: paging.offset
+        })
+      ),
+    [range.from, range.to, paging.offset, paging.limit]
   )
 
   const rows = returns.data?.rows ?? []
-  const total = rows.reduce((sum, row) => sum + row.total, 0)
-  const cashRefunded = rows
-    .filter((row) => row.refundType === 'cash')
-    .reduce((sum, row) => sum + row.total, 0)
+  // Server-side, over the whole period rather than the page on screen.
+  const matched = returns.data?.total ?? 0
+  const total = returns.data?.totals.total ?? 0
+  const cashRefunded = returns.data?.totals.cashRefunds ?? 0
+  const page = useClampedPage(paging, matched)
 
   const columns: Column<SaleReturn>[] = [
     { key: 'date', header: 'Date', width: '120px', render: (row) => format.date(row.date) },
@@ -84,11 +96,11 @@ export function SaleReturnsPage(): JSX.Element {
         <FilterSpacer />
       </FilterBar>
 
-      <PageBody>
+      <PageBody fill>
         <StatGrid>
           <StatTile label="Returned in period" unit={currency} value={format.money(total)} />
           <StatTile label="Cash refunded" unit={currency} value={format.money(cashRefunded)} />
-          <StatTile label="Returns recorded" value={rows.length} />
+          <StatTile label="Returns recorded" value={matched} />
         </StatGrid>
 
         <Card>
@@ -104,6 +116,13 @@ export function SaleReturnsPage(): JSX.Element {
                 title: 'No returns in this period',
                 description: 'Returned goods go back into stock and adjust profit automatically.'
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={matched}
+              onPageChange={paging.setPage}
+              noun="returns"
             />
           </CardBody>
         </Card>

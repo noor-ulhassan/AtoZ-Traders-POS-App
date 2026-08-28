@@ -38,6 +38,8 @@ export const productInputSchema = z.object({
   salePrice: moneySchema,
   reorderLevel: z.number().min(0, 'Reorder level cannot be negative.').max(10_000_000),
   isActive: z.boolean().optional(),
+  ownership: z.enum(['own', 'other']).optional(),
+  ownerName: optionalText(120),
   openingStock: z.number().min(0, 'Opening stock cannot be negative.').max(10_000_000).optional(),
   units: z
     .array(productUnitSchema)
@@ -55,6 +57,11 @@ export const productGetSchema = z.object({ id: idSchema })
 
 export const productIdSchema = z.object({ productId: idSchema })
 
+/** The commit half of an import names the file the main process already parsed. */
+export const productImportCommitSchema = z.object({
+  token: z.string().uuid('That import is no longer open. Choose the file again.')
+})
+
 export const productUnitsSetSchema = z.object({
   productId: idSchema,
   units: z.array(productUnitSchema).max(20)
@@ -66,7 +73,26 @@ export const productFiltersSchema = z
     categoryId: optionalIdSchema.optional(),
     status: z.enum(['active', 'inactive', 'all']).optional(),
     lowStockOnly: z.boolean().optional(),
+    ownership: z.enum(['own', 'other', 'all']).optional(),
     ...paginationSchema
+  })
+  .optional()
+  .transform((value) => value ?? {})
+
+export const otherStockMovementSchema = z.object({
+  productId: idSchema,
+  qty: quantitySchema,
+  unitName: nonEmptyText('Unit', 40).optional(),
+  date: isoDateSchema.optional(),
+  notes: optionalText(300)
+})
+
+export const otherStockFiltersSchema = z
+  .object({
+    from: isoDateSchema.optional(),
+    to: isoDateSchema.optional(),
+    ownerName: z.string().trim().max(120).optional(),
+    search: z.string().trim().max(120).optional()
   })
   .optional()
   .transform((value) => value ?? {})
@@ -84,7 +110,17 @@ export const stockMovementFiltersSchema = z
     from: isoDateSchema.optional(),
     to: isoDateSchema.optional(),
     reason: z
-      .enum(['opening', 'purchase', 'sale', 'sale_return', 'purchase_return', 'adjustment', 'all'])
+      .enum([
+        'opening',
+        'purchase',
+        'sale',
+        'sale_return',
+        'purchase_return',
+        'adjustment',
+        'other_in',
+        'other_out',
+        'all'
+      ])
       .optional(),
     ...paginationSchema
   })

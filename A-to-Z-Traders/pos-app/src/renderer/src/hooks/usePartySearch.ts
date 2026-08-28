@@ -18,17 +18,17 @@ export function usePartySearch(
   const debounced = useDebounced(query, 150)
   const service = partyType === 'customer' ? api.customers : api.suppliers
 
-  const result = useQuery(
-    () =>
+  const result = useQuery<Customer[]>(
+    async () =>
       debounced.trim().length === 0
-        ? Promise.resolve({ rows: [], total: 0 })
-        : unwrap(service.list({ search: debounced.trim(), limit })),
+        ? []
+        : (await unwrap(service.list({ search: debounced.trim(), limit }))).rows,
     [debounced, limit, partyType]
   )
 
   const options = useMemo<ComboOption<Customer>[]>(
     () =>
-      (result.data?.rows ?? []).map((party) => {
+      (result.data ?? []).map((party) => {
         const balance = format.balanceLabel(party.currentBalance, partyType)
         return {
           value: party,

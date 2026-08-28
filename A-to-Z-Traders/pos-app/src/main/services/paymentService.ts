@@ -1,4 +1,11 @@
-import type { Id, Page, Payment, PaymentFilters, PaymentInput } from '@shared/types'
+import type {
+  Id,
+  PageWithTotals,
+  Payment,
+  PaymentFilters,
+  PaymentInput,
+  PaymentPageTotals
+} from '@shared/types'
 import { today } from '@shared/date'
 import { money } from '@shared/money'
 import { getDb } from '../db/connection'
@@ -7,7 +14,9 @@ import * as payments from '../repositories/paymentRepository'
 import { businessRule, notFound } from '../utils/errors'
 import { requireParty } from './partyService'
 
-export function listPayments(filters: PaymentFilters = {}): Page<Payment> {
+export function listPayments(
+  filters: PaymentFilters = {}
+): PageWithTotals<Payment, PaymentPageTotals> {
   return payments.listPayments(getDb(), filters)
 }
 

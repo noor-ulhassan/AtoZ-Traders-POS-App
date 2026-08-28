@@ -45,6 +45,7 @@ export function buildReceipt(sale: SaleWithItems): Receipt {
       : null,
     lines: sale.items.map((item) => ({
       name: item.productName,
+      isOther: item.isOther,
       unitName: item.unitName,
       qty: item.qty,
       rate: item.rate,
@@ -53,6 +54,7 @@ export function buildReceipt(sale: SaleWithItems): Receipt {
     })),
     totals: {
       subtotal: sale.subtotal,
+      otherSubtotal: sale.otherSubtotal,
       discount: sale.discount,
       taxLabel: settings.taxEnabled ? `Tax (${settings.taxRate}%)` : 'Tax',
       tax: sale.tax,

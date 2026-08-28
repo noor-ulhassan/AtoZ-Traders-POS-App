@@ -1,10 +1,11 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   PurchaseReturn,
   PurchaseReturnInput,
   PurchaseReturnWithItems,
   ReturnFilters,
+  ReturnPageTotals,
   SaleReturn,
   SaleReturnInput,
   SaleReturnWithItems
@@ -38,7 +39,9 @@ function productOf<P extends { id: Id }>(lines: { product: P }[], productId: Id)
 
 // ------------------------------------------------------------ sale returns
 
-export function listSaleReturns(filters: ReturnFilters = {}): Page<SaleReturn> {
+export function listSaleReturns(
+  filters: ReturnFilters = {}
+): PageWithTotals<SaleReturn, ReturnPageTotals> {
   return returns.listSaleReturns(getDb(), filters)
 }
 
@@ -88,10 +91,14 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
     const lineQty = qty(item.qty)
     const baseQty = qty(lineQty * unit.factor)
 
-    const costPrice =
-      (saleId != null
-        ? returns.findOriginalSaleCost(db, saleId, product.id, unit.unitName)
-        : null) ?? product.costPrice
+    // Consignment goods never had a cost to the shop, so there is no profit to
+    // reverse — the same zero the sale line carried.
+    const isOther = product.ownership === 'other'
+    const costPrice = isOther
+      ? 0
+      : ((saleId != null
+          ? returns.findOriginalSaleCost(db, saleId, product.id, unit.unitName)
+          : null) ?? product.costPrice)
 
     return {
       product,
@@ -101,6 +108,7 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
       baseQty,
       rate: money(item.rate),
       costPrice,
+      isOther,
       amount: money(lineQty * item.rate)
     }
   })
@@ -123,6 +131,7 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
   }
 
   const total = sumMoney(lines.map((line) => line.amount))
+  const otherTotal = sumMoney(lines.filter((line) => line.isOther).map((line) => line.amount))
 
   const create = db.transaction(() => {
     const returnId = returns.insertSaleReturn(db, {
@@ -130,6 +139,7 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
       customerId,
       date,
       total,
+      otherTotal,
       refundType: input.refundType,
       notes: input.notes ?? null
     })
@@ -144,6 +154,7 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
         baseQty: line.baseQty,
         rate: line.rate,
         costPrice: line.costPrice,
+        isOther: line.isOther,
         amount: line.amount
       })
 
@@ -172,7 +183,9 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
 
 // -------------------------------------------------------- purchase returns
 
-export function listPurchaseReturns(filters: ReturnFilters = {}): Page<PurchaseReturn> {
+export function listPurchaseReturns(
+  filters: ReturnFilters = {}
+): PageWithTotals<PurchaseReturn, ReturnPageTotals> {
   return returns.listPurchaseReturns(getDb(), filters)
 }
 

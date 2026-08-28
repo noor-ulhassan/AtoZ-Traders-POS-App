@@ -1,7 +1,16 @@
-import type { Id, Page, PaymentType, Sale, SaleFilters, SaleItem } from '@shared/types'
+import type {
+  Id,
+  PageWithTotals,
+  PaymentType,
+  Sale,
+  SaleFilters,
+  SaleItem,
+  SalePageTotals
+} from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
-import { toText } from '../db/rows'
+import { fromBool, toBool, toText } from '../db/rows'
 
 /** Invoice numbers look like `INV-000042`. The prefix is fixed on purpose: it
  *  is parsed back out to find the next number, so it must never vary. */
@@ -15,6 +24,7 @@ interface SaleRow {
   customer_name: string | null
   date: string
   subtotal: number
+  other_subtotal: number
   discount: number
   tax: number
   total: number
@@ -36,6 +46,7 @@ interface SaleItemRow {
   rate: number
   line_discount: number
   cost_price: number
+  is_other: number
   amount: number
 }
 
@@ -46,6 +57,7 @@ const toSale = (row: SaleRow): Sale => ({
   customerName: row.customer_name,
   date: row.date,
   subtotal: row.subtotal,
+  otherSubtotal: row.other_subtotal,
   discount: row.discount,
   tax: row.tax,
   total: row.total,
@@ -67,6 +79,7 @@ const toItem = (row: SaleItemRow): SaleItem => ({
   rate: row.rate,
   lineDiscount: row.line_discount,
   costPrice: row.cost_price,
+  isOther: toBool(row.is_other),
   amount: row.amount
 })
 
@@ -105,9 +118,9 @@ function buildFilter(filters: SaleFilters): { where: string; params: unknown[] }
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listSales(db: Db, filters: SaleFilters = {}): Page<Sale> {
+export function listSales(db: Db, filters: SaleFilters = {}): PageWithTotals<Sale, SalePageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 100
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -116,13 +129,29 @@ export function listSales(db: Db, filters: SaleFilters = {}): Page<Sale> {
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(
-      `SELECT COUNT(*) AS total FROM sales s LEFT JOIN customers c ON c.id = s.customer_id ${where}`
+  const summary = db
+    .prepare<
+      unknown[],
+      { total: number; sum_total: number | null; sum_paid: number | null; on_khata: number | null }
+    >(
+      `SELECT COUNT(*)                                    AS total,
+              SUM(s.total)                                AS sum_total,
+              SUM(s.paid_amount)                          AS sum_paid,
+              SUM(MAX(0, ROUND(s.total - s.paid_amount, 2))) AS on_khata
+         FROM sales s
+         LEFT JOIN customers c ON c.id = s.customer_id ${where}`
     )
     .get(...params)
 
-  return { rows: rows.map(toSale), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toSale),
+    total: summary?.total ?? 0,
+    totals: {
+      total: money(summary?.sum_total ?? 0),
+      paid: money(summary?.sum_paid ?? 0),
+      onKhata: money(summary?.on_khata ?? 0)
+    }
+  }
 }
 
 export function findSale(db: Db, id: Id): Sale | null {
@@ -168,6 +197,7 @@ export interface SaleHeaderFields {
   customerId: Id | null
   date: string
   subtotal: number
+  otherSubtotal: number
   discount: number
   tax: number
   total: number
@@ -180,14 +210,16 @@ export function insertSale(db: Db, fields: SaleHeaderFields): Id {
   const info = db
     .prepare(
       `INSERT INTO sales
-         (invoice_no, customer_id, date, subtotal, discount, tax, total, paid_amount, payment_type, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (invoice_no, customer_id, date, subtotal, other_subtotal, discount, tax,
+          total, paid_amount, payment_type, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.invoiceNo,
       fields.customerId,
       fields.date,
       money(fields.subtotal),
+      money(fields.otherSubtotal),
       money(fields.discount),
       money(fields.tax),
       money(fields.total),
@@ -208,6 +240,7 @@ export interface SaleItemFields {
   rate: number
   lineDiscount: number
   costPrice: number
+  isOther: boolean
   amount: number
 }
 
@@ -215,8 +248,9 @@ export function insertSaleItem(db: Db, fields: SaleItemFields): Id {
   const info = db
     .prepare(
       `INSERT INTO sale_items
-         (sale_id, product_id, unit_name, factor, qty, base_qty, rate, line_discount, cost_price, amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (sale_id, product_id, unit_name, factor, qty, base_qty, rate,
+          line_discount, cost_price, is_other, amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.saleId,
@@ -228,6 +262,7 @@ export function insertSaleItem(db: Db, fields: SaleItemFields): Id {
       money(fields.rate),
       money(fields.lineDiscount),
       money(fields.costPrice),
+      fromBool(fields.isOther),
       money(fields.amount)
     )
   return Number(info.lastInsertRowid)

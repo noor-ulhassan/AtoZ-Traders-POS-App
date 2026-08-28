@@ -68,3 +68,14 @@ export interface ExpenseFilters {
   limit?: number
   offset?: number
 }
+
+/** Aggregates over every payment the filters match, not just the page shown. */
+export interface PaymentPageTotals {
+  received: number
+  paid: number
+}
+
+/** Aggregates over every expense the filters match, not just the page shown. */
+export interface ExpensePageTotals {
+  amount: number
+}
