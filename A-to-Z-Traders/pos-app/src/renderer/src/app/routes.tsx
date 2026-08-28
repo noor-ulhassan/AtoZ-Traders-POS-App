@@ -8,6 +8,7 @@ import { SaleReturnsPage } from '../features/returns/SaleReturnsPage'
 import { PurchaseReturnsPage } from '../features/returns/PurchaseReturnsPage'
 import { ProductsPage } from '../features/products/ProductsPage'
 import { StockLedgerPage } from '../features/products/StockLedgerPage'
+import { OtherStockPage } from '../features/otherStock/OtherStockPage'
 import { PurchasesPage } from '../features/purchases/PurchasesPage'
 import { PurchaseEntryPage } from '../features/purchases/PurchaseEntryPage'
 import { CustomersPage } from '../features/parties/CustomersPage'
@@ -51,6 +52,14 @@ export function AppRoutes(): JSX.Element {
           element={
             <Guarded feature="purchaseReturns">
               <PurchaseReturnsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/other-stock"
+          element={
+            <Guarded feature="otherStock">
+              <OtherStockPage />
             </Guarded>
           }
         />

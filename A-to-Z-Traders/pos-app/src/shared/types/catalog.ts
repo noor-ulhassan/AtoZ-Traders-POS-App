@@ -21,6 +21,14 @@ export interface ProductUnit {
   salePrice: number | null
 }
 
+/**
+ * Whose goods these are.
+ *
+ * 'other' is consignment: the shop sells them but does not own them, so they
+ * are deliberately kept out of every cost, profit and stock-value figure.
+ */
+export type Ownership = 'own' | 'other'
+
 export interface Product {
   id: Id
   name: string
@@ -37,6 +45,9 @@ export interface Product {
   stockQty: number
   reorderLevel: number
   isActive: boolean
+  ownership: Ownership
+  /** Who the goods belong to. '' for the shop's own stock. */
+  ownerName: string
   createdAt: IsoTimestamp
   updatedAt: IsoTimestamp
 }
@@ -56,6 +67,8 @@ export interface ProductFilters {
   status?: 'active' | 'inactive' | 'all'
   /** Only products at or below their reorder level. */
   lowStockOnly?: boolean
+  /** Defaults to every product, whoever owns it. */
+  ownership?: Ownership | 'all'
   limit?: number
   offset?: number
 }
@@ -71,6 +84,10 @@ export interface ProductInput {
   salePrice: number
   reorderLevel: number
   isActive?: boolean
+  /** Defaults to 'own'. Changeable only while the product holds no stock. */
+  ownership?: Ownership
+  /** Required when ownership is 'other'; ignored otherwise. */
+  ownerName?: string | null
   /** Create-only. Ignored on update — use a stock adjustment instead. */
   openingStock?: number
   units?: ProductUnitInput[]

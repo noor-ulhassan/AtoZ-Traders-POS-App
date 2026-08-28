@@ -1,4 +1,5 @@
 import type { Id } from './common'
+import type { Ownership } from './catalog'
 
 /**
  * Bulk product import from a spreadsheet.
@@ -27,6 +28,10 @@ export interface ImportRowPreview {
   barcode: string | null
   categoryName: string | null
   baseUnit: string
+  /** 'other' when the file named an owner for the row. */
+  ownership: Ownership
+  /** Who the goods belong to; null for the shop's own stock. */
+  ownerName: string | null
   costPrice: number
   salePrice: number
   openingStock: number

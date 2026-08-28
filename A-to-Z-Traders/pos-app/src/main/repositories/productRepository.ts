@@ -6,6 +6,7 @@ import type {
   ProductPageTotals,
   ProductUnit,
   ProductUnitInput,
+  Ownership,
   SellableUnit
 } from '@shared/types'
 import { money, qty } from '@shared/money'
@@ -26,6 +27,8 @@ interface ProductRow {
   stock_qty: number
   reorder_level: number
   is_active: number
+  ownership: 'own' | 'other'
+  owner_name: string
   created_at: string
   updated_at: string
 }
@@ -51,6 +54,8 @@ const toProduct = (row: ProductRow): Product => ({
   stockQty: row.stock_qty,
   reorderLevel: row.reorder_level,
   isActive: toBool(row.is_active),
+  ownership: row.ownership,
+  ownerName: row.owner_name,
   createdAt: row.created_at,
   updatedAt: row.updated_at
 })
@@ -91,6 +96,12 @@ function buildFilter(filters: ProductFilters): { where: string; params: unknown[
 
   if (filters.lowStockOnly) {
     clauses.push('p.reorder_level > 0 AND p.stock_qty <= p.reorder_level')
+  }
+
+  const ownership = filters.ownership ?? 'all'
+  if (ownership !== 'all') {
+    clauses.push('p.ownership = ?')
+    params.push(ownership)
   }
 
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
@@ -148,14 +159,17 @@ export interface ProductWriteFields {
   salePrice: number
   reorderLevel: number
   isActive: boolean
+  ownership: Ownership
+  ownerName: string
 }
 
 export function insertProduct(db: Db, fields: ProductWriteFields): Id {
   const info = db
     .prepare(
       `INSERT INTO products
-         (name, sku, barcode, category_id, base_unit, cost_price, sale_price, reorder_level, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, sku, barcode, category_id, base_unit, cost_price, sale_price,
+          reorder_level, is_active, ownership, owner_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.name,
@@ -166,7 +180,9 @@ export function insertProduct(db: Db, fields: ProductWriteFields): Id {
       money(fields.costPrice),
       money(fields.salePrice),
       qty(fields.reorderLevel),
-      fields.isActive ? 1 : 0
+      fields.isActive ? 1 : 0,
+      fields.ownership,
+      fields.ownerName
     )
   return Number(info.lastInsertRowid)
 }
@@ -176,6 +192,7 @@ export function updateProduct(db: Db, id: Id, fields: ProductWriteFields): void 
     `UPDATE products
         SET name = ?, sku = ?, barcode = ?, category_id = ?, base_unit = ?,
             cost_price = ?, sale_price = ?, reorder_level = ?, is_active = ?,
+            ownership = ?, owner_name = ?,
             updated_at = datetime('now','localtime')
       WHERE id = ?`
   ).run(
@@ -188,6 +205,8 @@ export function updateProduct(db: Db, id: Id, fields: ProductWriteFields): void 
     money(fields.salePrice),
     qty(fields.reorderLevel),
     fields.isActive ? 1 : 0,
+    fields.ownership,
+    fields.ownerName,
     id
   )
 }

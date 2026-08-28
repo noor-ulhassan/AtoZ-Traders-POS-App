@@ -109,12 +109,13 @@ function buildDataset(report: ExportName, filters: ExportFilters, currency: stri
             rate: number
             line_discount: number
             cost_price: number
+            is_other: number
             amount: number
           }
         >(
           `SELECT s.invoice_no, s.date, c.name AS customer_name, p.name AS product_name,
                   si.unit_name, si.qty, si.base_qty, si.rate, si.line_discount,
-                  si.cost_price, si.amount
+                  si.cost_price, si.is_other, si.amount
              FROM sale_items si
              JOIN sales s ON s.id = si.sale_id
              JOIN products p ON p.id = si.product_id
@@ -143,10 +144,14 @@ function buildDataset(report: ExportName, filters: ExportFilters, currency: stri
           },
           { header: m('Amount'), value: (r) => csvMoney(r.amount), sum: (r) => r.amount },
           { header: m('Cost / base unit'), value: (r) => csvMoney(r.cost_price) },
+          { header: 'Whose goods', value: (r) => (r.is_other ? 'Other stock' : 'Own') },
           {
+            // Consignment lines earn the shop nothing, so they contribute
+            // nothing here — the column and its total say the same thing the
+            // P&L does.
             header: m('Profit'),
-            value: (r) => csvMoney(r.amount - r.cost_price * r.base_qty),
-            sum: (r) => r.amount - r.cost_price * r.base_qty
+            value: (r) => (r.is_other ? csvMoney(0) : csvMoney(r.amount - r.cost_price * r.base_qty)),
+            sum: (r) => (r.is_other ? 0 : r.amount - r.cost_price * r.base_qty)
           }
         ],
         rows
@@ -189,6 +194,8 @@ function buildDataset(report: ExportName, filters: ExportFilters, currency: stri
           { header: 'Reorder level', value: (r) => csvQty(r.reorderLevel) },
           { header: m('Cost price'), value: (r) => csvMoney(r.costPrice) },
           { header: m('Sale price'), value: (r) => csvMoney(r.salePrice) },
+          { header: 'Whose goods', value: (r) => (r.ownership === 'other' ? 'Other stock' : 'Own') },
+          { header: 'Owner', value: (r) => r.ownerName },
           { header: 'Status', value: (r) => (r.isActive ? 'Active' : 'Inactive') }
         ],
         listProducts({ status: 'all', limit: LIMIT }).rows

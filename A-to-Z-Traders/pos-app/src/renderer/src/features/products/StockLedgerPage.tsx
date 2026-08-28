@@ -27,7 +27,9 @@ const REASON_META: Record<
   sale: { label: 'Sale', tone: 'accent' },
   sale_return: { label: 'Sale return', tone: 'good' },
   purchase_return: { label: 'Purchase return', tone: 'bad' },
-  adjustment: { label: 'Adjustment', tone: 'warn' }
+  adjustment: { label: 'Adjustment', tone: 'warn' },
+  other_in: { label: 'Other stock in', tone: 'neutral' },
+  other_out: { label: 'Back to owner', tone: 'neutral' }
 }
 
 /**

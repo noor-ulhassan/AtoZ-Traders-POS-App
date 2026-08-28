@@ -23,6 +23,9 @@ import type {
   IpcResult,
   LedgerStatement,
   LowStockRow,
+  OtherStockFilters,
+  OtherStockMovementInput,
+  OtherStockReport,
   Page,
   PageWithTotals,
   PartyFilters,
@@ -125,6 +128,11 @@ export const IPC_CHANNELS = {
 
   stockAdjust: 'stock:adjust',
   stockMovements: 'stock:movements',
+
+  otherStockReport: 'otherStock:report',
+  otherStockOwners: 'otherStock:owners',
+  otherStockReceive: 'otherStock:receive',
+  otherStockReturn: 'otherStock:return',
 
   customersList: 'customers:list',
   customersGet: 'customers:get',
@@ -256,6 +264,19 @@ export interface PosApi {
   stock: {
     adjust(input: StockAdjustmentInput): Result<{ productId: Id; stockQty: number }>
     movements(filters?: StockMovementFilters): Result<Page<StockMovement>>
+  }
+
+  /**
+   * Goods the shop sells but does not own.
+   *
+   * Intake and return deliberately sit here rather than under purchases: no
+   * money moves either way, and no supplier balance is involved.
+   */
+  otherStock: {
+    report(filters?: OtherStockFilters): Result<OtherStockReport>
+    owners(): Result<string[]>
+    receive(input: OtherStockMovementInput): Result<{ productId: Id; stockQty: number }>
+    sendBack(input: OtherStockMovementInput): Result<{ productId: Id; stockQty: number }>
   }
 
   customers: {

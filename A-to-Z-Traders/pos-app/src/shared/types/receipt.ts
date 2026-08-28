@@ -27,6 +27,14 @@ export interface Receipt {
   lines: ReceiptLine[]
   totals: {
     subtotal: number
+    /**
+     * The consignment part of the subtotal, or 0 when the bill has none.
+     *
+     * Shown as its own line so the customer's paperwork says what the shop's
+     * own records say — and so the shop can tell at a glance, from the printed
+     * copy alone, how much of a bill it has to account for to somebody else.
+     */
+    otherSubtotal: number
     discount: number
     taxLabel: string
     tax: number
@@ -42,6 +50,8 @@ export interface Receipt {
 
 export interface ReceiptLine {
   name: string
+  /** True for consignment goods, so the line can be marked on the printout. */
+  isOther: boolean
   unitName: string
   qty: number
   rate: number

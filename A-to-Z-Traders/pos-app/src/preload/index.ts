@@ -81,6 +81,13 @@ const api = {
     movements: (filters) => invoke(IPC_CHANNELS.stockMovements, filters)
   },
 
+  otherStock: {
+    report: (filters) => invoke(IPC_CHANNELS.otherStockReport, filters),
+    owners: () => invoke(IPC_CHANNELS.otherStockOwners),
+    receive: (input) => invoke(IPC_CHANNELS.otherStockReceive, input),
+    sendBack: (input) => invoke(IPC_CHANNELS.otherStockReturn, input)
+  },
+
   customers: {
     list: (filters) => invoke(IPC_CHANNELS.customersList, filters),
     get: (id) => invoke(IPC_CHANNELS.customersGet, { id }),

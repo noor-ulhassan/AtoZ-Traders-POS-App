@@ -17,6 +17,7 @@ export type Feature =
   | 'purchaseReturns'
   | 'products'
   | 'stock'
+  | 'otherStock'
   | 'purchases'
   | 'customers'
   | 'suppliers'

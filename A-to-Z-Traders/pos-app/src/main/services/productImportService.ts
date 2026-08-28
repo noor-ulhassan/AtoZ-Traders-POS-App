@@ -6,6 +6,7 @@ import type {
   Id,
   ImportRowIssue,
   ImportRowPreview,
+  Ownership,
   ProductImportPreview,
   ProductImportResult
 } from '@shared/types'
@@ -46,7 +47,11 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   costPrice: ['cost', 'cost price', 'purchase price', 'buy price', 'buying price'],
   salePrice: ['price', 'sale price', 'selling price', 'sell price', 'mrp', 'rate'],
   openingStock: ['stock', 'opening stock', 'qty', 'quantity', 'on hand'],
-  reorderLevel: ['reorder', 'reorder level', 'min stock', 'minimum']
+  reorderLevel: ['reorder', 'reorder level', 'min stock', 'minimum'],
+  // Naming an owner is what marks a row as consignment stock. There is no
+  // separate yes/no column, because the name is the thing actually needed —
+  // "other stock" with nobody's name against it is not a usable record.
+  ownerName: ['owner', 'owner name', 'belongs to', 'consignor', 'supplier owner']
 }
 
 type Field = keyof typeof COLUMN_ALIASES
@@ -223,6 +228,8 @@ export function buildPreview(db: Db, text: string, fileName: string): ProductImp
     const barcode = optional(cell(raw, map.barcode))
     const categoryName = optional(cell(raw, map.category))
     const baseUnit = cell(raw, map.baseUnit) || 'piece'
+    const ownerName = optional(cell(raw, map.ownerName))
+    const ownership: Ownership = ownerName ? 'other' : 'own'
 
     if (name === '') issues.push({ column: 'Name', message: 'A product needs a name.' })
     if (name.length > 160) {
@@ -230,6 +237,9 @@ export function buildPreview(db: Db, text: string, fileName: string): ProductImp
     }
     if (baseUnit.length > 40) {
       issues.push({ column: 'Unit', message: 'That unit name is longer than 40 characters.' })
+    }
+    if (ownerName !== null && ownerName.length > 120) {
+      issues.push({ column: 'Owner', message: 'That owner name is longer than 120 characters.' })
     }
 
     const costPrice = readNumberField(
@@ -320,7 +330,9 @@ export function buildPreview(db: Db, text: string, fileName: string): ProductImp
       barcode,
       categoryName,
       baseUnit,
-      costPrice: money(costPrice),
+      ownership,
+      ownerName,
+      costPrice: money(ownership === 'other' ? 0 : costPrice),
       salePrice: money(salePrice),
       openingStock: qty(openingStock),
       reorderLevel: qty(reorderLevel),
@@ -464,7 +476,12 @@ export function commitImport(token: string): ProductImportResult {
           costPrice: existing.stockQty === 0 ? row.costPrice : existing.costPrice,
           salePrice: row.salePrice,
           reorderLevel: row.reorderLevel,
-          isActive: existing.isActive
+          isActive: existing.isActive,
+          // Whose goods these are decides whether the shelf holds an asset or
+          // somebody else's property, so a file may not flip it under stock
+          // that is already there — the same rule the product form applies.
+          ownership: existing.stockQty === 0 ? row.ownership : existing.ownership,
+          ownerName: existing.stockQty === 0 ? (row.ownerName ?? '') : existing.ownerName
         })
         updated += 1
         continue
@@ -479,7 +496,9 @@ export function commitImport(token: string): ProductImportResult {
         costPrice: row.costPrice,
         salePrice: row.salePrice,
         reorderLevel: row.reorderLevel,
-        isActive: true
+        isActive: true,
+        ownership: row.ownership,
+        ownerName: row.ownerName ?? ''
       })
 
       if (row.openingStock > 0) {
@@ -488,7 +507,9 @@ export function commitImport(token: string): ProductImportResult {
         stock.insertMovement(db, {
           productId: id,
           changeQty: row.openingStock,
-          reason: 'opening',
+          // Consignment goods arrived from their owner; they were never opening
+          // stock the shop paid for, and the ledger should say so.
+          reason: row.ownership === 'other' ? 'other_in' : 'opening',
           refTable: 'products',
           refId: id,
           costPrice: row.costPrice,

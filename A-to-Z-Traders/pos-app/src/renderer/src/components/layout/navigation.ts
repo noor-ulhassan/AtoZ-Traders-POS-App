@@ -45,7 +45,8 @@ export const NAVIGATION: NavGroup[] = [
         icon: 'returns',
         feature: 'purchaseReturns'
       },
-      { to: '/stock', label: 'Stock ledger', icon: 'stock', feature: 'stock' }
+      { to: '/stock', label: 'Stock ledger', icon: 'stock', feature: 'stock' },
+      { to: '/other-stock', label: 'Other stock', icon: 'ledger', feature: 'otherStock' }
     ]
   },
   {

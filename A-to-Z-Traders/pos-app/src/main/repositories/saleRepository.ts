@@ -10,7 +10,7 @@ import type {
 import { money, qty } from '@shared/money'
 import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
-import { toText } from '../db/rows'
+import { fromBool, toBool, toText } from '../db/rows'
 
 /** Invoice numbers look like `INV-000042`. The prefix is fixed on purpose: it
  *  is parsed back out to find the next number, so it must never vary. */
@@ -24,6 +24,7 @@ interface SaleRow {
   customer_name: string | null
   date: string
   subtotal: number
+  other_subtotal: number
   discount: number
   tax: number
   total: number
@@ -45,6 +46,7 @@ interface SaleItemRow {
   rate: number
   line_discount: number
   cost_price: number
+  is_other: number
   amount: number
 }
 
@@ -55,6 +57,7 @@ const toSale = (row: SaleRow): Sale => ({
   customerName: row.customer_name,
   date: row.date,
   subtotal: row.subtotal,
+  otherSubtotal: row.other_subtotal,
   discount: row.discount,
   tax: row.tax,
   total: row.total,
@@ -76,6 +79,7 @@ const toItem = (row: SaleItemRow): SaleItem => ({
   rate: row.rate,
   lineDiscount: row.line_discount,
   costPrice: row.cost_price,
+  isOther: toBool(row.is_other),
   amount: row.amount
 })
 
@@ -196,6 +200,7 @@ export interface SaleHeaderFields {
   customerId: Id | null
   date: string
   subtotal: number
+  otherSubtotal: number
   discount: number
   tax: number
   total: number
@@ -208,14 +213,16 @@ export function insertSale(db: Db, fields: SaleHeaderFields): Id {
   const info = db
     .prepare(
       `INSERT INTO sales
-         (invoice_no, customer_id, date, subtotal, discount, tax, total, paid_amount, payment_type, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (invoice_no, customer_id, date, subtotal, other_subtotal, discount, tax,
+          total, paid_amount, payment_type, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.invoiceNo,
       fields.customerId,
       fields.date,
       money(fields.subtotal),
+      money(fields.otherSubtotal),
       money(fields.discount),
       money(fields.tax),
       money(fields.total),
@@ -236,6 +243,7 @@ export interface SaleItemFields {
   rate: number
   lineDiscount: number
   costPrice: number
+  isOther: boolean
   amount: number
 }
 
@@ -243,8 +251,9 @@ export function insertSaleItem(db: Db, fields: SaleItemFields): Id {
   const info = db
     .prepare(
       `INSERT INTO sale_items
-         (sale_id, product_id, unit_name, factor, qty, base_qty, rate, line_discount, cost_price, amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (sale_id, product_id, unit_name, factor, qty, base_qty, rate,
+          line_discount, cost_price, is_other, amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.saleId,
@@ -256,6 +265,7 @@ export function insertSaleItem(db: Db, fields: SaleItemFields): Id {
       money(fields.rate),
       money(fields.lineDiscount),
       money(fields.costPrice),
+      fromBool(fields.isOther),
       money(fields.amount)
     )
   return Number(info.lastInsertRowid)

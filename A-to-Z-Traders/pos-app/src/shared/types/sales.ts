@@ -14,8 +14,17 @@ export interface SaleItem {
   /** Actual sale price per chosen unit. */
   rate: number
   lineDiscount: number
-  /** Weighted-average cost per base unit, captured at sale time. */
+  /** Weighted-average cost per base unit, captured at sale time. Zero for
+   *  consignment lines, which cost the shop nothing. */
   costPrice: number
+  /**
+   * Whether this line was consignment stock, frozen at sale time.
+   *
+   * Every profit and cost figure filters on this. It lives on the line rather
+   * than being joined from `products` so reclassifying a product later cannot
+   * restate what an old bill earned.
+   */
+  isOther: boolean
   /** qty * rate - lineDiscount */
   amount: number
 }
@@ -27,6 +36,8 @@ export interface Sale {
   customerName: string | null
   date: IsoDate
   subtotal: number
+  /** The part of `subtotal` that came from consignment lines. */
+  otherSubtotal: number
   discount: number
   tax: number
   total: number

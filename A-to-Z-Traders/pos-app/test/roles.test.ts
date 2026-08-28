@@ -146,6 +146,15 @@ describe('access policy (fail-closed)', () => {
     // Bulk import rewrites the catalogue and its prices in one go.
     expect(isAuthorized(IPC_CHANNELS.productsImportPreview, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.productsImportCommit, {})).toBe(false)
+    // The consignment register is an account of someone else's property.
+    expect(isAuthorized(IPC_CHANNELS.otherStockReport, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.otherStockReceive, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.otherStockReturn, {})).toBe(false)
+    // Backups: the folder, the copies, and the ability to replace everything.
+    expect(isAuthorized(IPC_CHANNELS.backupStatus, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupList, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupRunNow, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupRestoreFrom, {})).toBe(false)
   })
 
   it('denies a shopkeeper any channel added since the allowlist was written', () => {

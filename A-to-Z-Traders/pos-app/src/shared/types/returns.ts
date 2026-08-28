@@ -14,6 +14,8 @@ export interface SaleReturnItem {
   rate: number
   /** Captured for correct profit reversal. */
   costPrice: number
+  /** Frozen at return time, mirroring the sale line it reverses. */
+  isOther: boolean
   amount: number
 }
 
@@ -25,6 +27,8 @@ export interface SaleReturn {
   customerName: string | null
   date: IsoDate
   total: number
+  /** The part of `total` that was consignment stock. */
+  otherTotal: number
   refundType: RefundType
   notes: string | null
   createdAt: IsoTimestamp

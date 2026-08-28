@@ -12,7 +12,7 @@ import type {
 import { money, qty } from '@shared/money'
 import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
-import { toText } from '../db/rows'
+import { fromBool, toBool, toText } from '../db/rows'
 
 // ------------------------------------------------------------ sale returns
 
@@ -24,6 +24,7 @@ interface SaleReturnRow {
   customer_name: string | null
   date: string
   total: number
+  other_total: number
   refund_type: RefundType
   notes: string | null
   created_at: string
@@ -40,6 +41,7 @@ interface SaleReturnItemRow {
   base_qty: number
   rate: number
   cost_price: number
+  is_other: number
   amount: number
 }
 
@@ -51,6 +53,7 @@ const toSaleReturn = (row: SaleReturnRow): SaleReturn => ({
   customerName: row.customer_name,
   date: row.date,
   total: row.total,
+  otherTotal: row.other_total,
   refundType: row.refund_type,
   notes: toText(row.notes),
   createdAt: row.created_at
@@ -149,6 +152,7 @@ export function listSaleReturnItems(db: Db, saleReturnId: Id): SaleReturnItem[] 
       baseQty: row.base_qty,
       rate: row.rate,
       costPrice: row.cost_price,
+      isOther: toBool(row.is_other),
       amount: row.amount
     }))
 }
@@ -160,20 +164,24 @@ export function insertSaleReturn(
     customerId: Id | null
     date: string
     total: number
+    /** The part of `total` that was consignment stock. */
+    otherTotal: number
     refundType: RefundType
     notes: string | null
   }
 ): Id {
   const info = db
     .prepare(
-      `INSERT INTO sale_returns (sale_id, customer_id, date, total, refund_type, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO sale_returns
+         (sale_id, customer_id, date, total, other_total, refund_type, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       fields.saleId,
       fields.customerId,
       fields.date,
       money(fields.total),
+      money(fields.otherTotal),
       fields.refundType,
       fields.notes
     )
@@ -191,13 +199,15 @@ export function insertSaleReturnItem(
     baseQty: number
     rate: number
     costPrice: number
+    isOther: boolean
     amount: number
   }
 ): void {
   db.prepare(
     `INSERT INTO sale_return_items
-       (sale_return_id, product_id, unit_name, factor, qty, base_qty, rate, cost_price, amount)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (sale_return_id, product_id, unit_name, factor, qty, base_qty, rate,
+        cost_price, is_other, amount)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     fields.saleReturnId,
     fields.productId,
@@ -207,6 +217,7 @@ export function insertSaleReturnItem(
     qty(fields.baseQty),
     money(fields.rate),
     money(fields.costPrice),
+    fromBool(fields.isOther),
     money(fields.amount)
   )
 }

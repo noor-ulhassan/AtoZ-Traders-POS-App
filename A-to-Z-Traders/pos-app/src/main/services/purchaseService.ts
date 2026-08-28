@@ -59,6 +59,16 @@ export function createPurchase(input: PurchaseInput): PurchaseWithItems {
       throw businessRule(`Quantity for "${product.name}" must be more than zero.`)
     }
 
+    // A purchase pays a supplier and sets a weighted-average cost. Consignment
+    // goods are neither bought nor owed for, so they arrive through the other
+    // stock register instead — putting them on a purchase would invent a
+    // payable and a cost that do not exist.
+    if (product.ownership === 'other') {
+      throw businessRule(
+        `"${product.name}" belongs to ${product.ownerName}. Record it under Other stock, not as a purchase.`
+      )
+    }
+
     // Cost is entered per chosen unit; the database stores it per base unit.
     const costPerBase = money(item.unitCost / unit.factor)
     return {

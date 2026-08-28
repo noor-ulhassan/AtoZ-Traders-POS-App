@@ -129,7 +129,9 @@ export function ReceiptModal({
             {receipt.lines.map((line, index) => (
               <tr key={index}>
                 <td className={clsx(CELL, 'pr-2')}>
-                  {line.name}
+                  {/* The asterisk ties the line to the "of which other stock"
+                      figure below, on paper as well as on screen. */}
+                  {line.isOther ? `${line.name} *` : line.name}
                   <div className="text-[10px] text-ink-subtle">{line.unitName}</div>
                 </td>
                 <td className={clsx(CELL, 'text-right')}>{format.quantity(line.qty)}</td>
@@ -147,6 +149,12 @@ export function ReceiptModal({
             <span className={LABEL}>Subtotal</span>
             <span>{amount(receipt.totals.subtotal)}</span>
           </div>
+          {receipt.totals.otherSubtotal > 0 && (
+            <div className={ROW}>
+              <span className={LABEL}>* of which other stock</span>
+              <span>{amount(receipt.totals.otherSubtotal)}</span>
+            </div>
+          )}
           {receipt.totals.discount > 0 && (
             <div className={ROW}>
               <span className={LABEL}>Discount</span>

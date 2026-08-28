@@ -18,6 +18,21 @@ import { getDb } from '../db/connection'
 
 type RangeParams = { from: string; to: string }
 
+/**
+ * Consignment goods are excluded from every figure in this file.
+ *
+ * The margin on stock the shop does not own is not the shop's, so counting it
+ * as revenue or profit would overstate the business by exactly the amount that
+ * belongs to somebody else. The exclusion always reads a column on the row
+ * being aggregated — `sale_items.is_other`, `sales.other_subtotal`, and their
+ * equivalents on returns — never a join back to `products`. That is what makes
+ * it impossible to reclassify a product and silently restate an old month.
+ *
+ * The one number that deliberately DOES include consignment sales is cash in
+ * hand, over in dashboardService: the customer's money really did go into the
+ * drawer, whoever the goods belonged to.
+ */
+
 function scalar(db: Db, sql: string, params: RangeParams): number {
   const row = db.prepare<RangeParams, { value: number | null }>(sql).get(params)
   return money(row?.value ?? 0)
@@ -38,7 +53,7 @@ export function profitAndLoss(range: DateRange): ProfitLossReport {
 
   const grossSales = scalar(
     db,
-    'SELECT SUM(subtotal) AS value FROM sales WHERE date BETWEEN @from AND @to',
+    'SELECT SUM(subtotal - other_subtotal) AS value FROM sales WHERE date BETWEEN @from AND @to',
     params
   )
   const billDiscounts = scalar(
@@ -59,12 +74,12 @@ export function profitAndLoss(range: DateRange): ProfitLossReport {
     `SELECT SUM(si.cost_price * si.base_qty) AS value
        FROM sale_items si
        JOIN sales s ON s.id = si.sale_id
-      WHERE s.date BETWEEN @from AND @to`,
+      WHERE s.date BETWEEN @from AND @to AND si.is_other = 0`,
     params
   )
   const salesReturns = scalar(
     db,
-    'SELECT SUM(total) AS value FROM sale_returns WHERE date BETWEEN @from AND @to',
+    'SELECT SUM(total - other_total) AS value FROM sale_returns WHERE date BETWEEN @from AND @to',
     params
   )
   const returnedCogs = scalar(
@@ -72,7 +87,7 @@ export function profitAndLoss(range: DateRange): ProfitLossReport {
     `SELECT SUM(i.cost_price * i.base_qty) AS value
        FROM sale_return_items i
        JOIN sale_returns r ON r.id = i.sale_return_id
-      WHERE r.date BETWEEN @from AND @to`,
+      WHERE r.date BETWEEN @from AND @to AND i.is_other = 0`,
     params
   )
   const expenses = scalar(
@@ -111,7 +126,7 @@ export function profitAndLoss(range: DateRange): ProfitLossReport {
          JOIN sales s ON s.id = si.sale_id
          JOIN products p ON p.id = si.product_id
          LEFT JOIN categories c ON c.id = p.category_id
-        WHERE s.date BETWEEN @from AND @to
+        WHERE s.date BETWEEN @from AND @to AND si.is_other = 0
         GROUP BY c.id
         ORDER BY revenue DESC`
     )
@@ -167,7 +182,7 @@ export function productProfit(range: DateRange, limit = 500): ProductProfitRow[]
          JOIN sales s ON s.id = si.sale_id
          JOIN products p ON p.id = si.product_id
          LEFT JOIN categories c ON c.id = p.category_id
-        WHERE s.date BETWEEN @from AND @to
+        WHERE s.date BETWEEN @from AND @to AND si.is_other = 0
         GROUP BY si.product_id
         ORDER BY revenue DESC
         LIMIT @limit`
@@ -200,14 +215,14 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
       // tax. Using s.total would fold collected tax into both sales and profit —
       // tax is money held for the government, never earned (see profitAndLoss).
       // When tax is off (the default) this equals s.total exactly.
-      `SELECT s.date                            AS date,
-              SUM(s.subtotal - s.discount)      AS sales,
-              COUNT(DISTINCT s.id)              AS bill_count,
-              COALESCE(SUM(line.cogs), 0)       AS cogs
+      `SELECT s.date                                          AS date,
+              SUM(s.subtotal - s.other_subtotal - s.discount)  AS sales,
+              COUNT(DISTINCT s.id)                             AS bill_count,
+              COALESCE(SUM(line.cogs), 0)                      AS cogs
          FROM sales s
          LEFT JOIN (
               SELECT sale_id, SUM(cost_price * base_qty) AS cogs
-                FROM sale_items GROUP BY sale_id
+                FROM sale_items WHERE is_other = 0 GROUP BY sale_id
          ) line ON line.sale_id = s.id
         WHERE s.date BETWEEN @from AND @to
         GROUP BY s.date
@@ -281,7 +296,7 @@ export function stockValuation(): StockValuationReport {
               p.stock_qty, p.cost_price, p.sale_price
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.is_active = 1
+        WHERE p.is_active = 1 AND p.ownership = 'own'
         ORDER BY p.name COLLATE NOCASE`
     )
     .all()
@@ -327,7 +342,8 @@ export function lowStock(): LowStockRow[] {
       `SELECT p.id, p.name, p.sku, c.name AS category_name, p.base_unit, p.stock_qty, p.reorder_level
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.is_active = 1 AND p.reorder_level > 0 AND p.stock_qty <= p.reorder_level
+        WHERE p.is_active = 1 AND p.ownership = 'own'
+          AND p.reorder_level > 0 AND p.stock_qty <= p.reorder_level
         ORDER BY (p.stock_qty - p.reorder_level) ASC, p.name COLLATE NOCASE`
     )
     .all()

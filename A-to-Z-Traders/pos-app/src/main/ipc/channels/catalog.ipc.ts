@@ -1,6 +1,7 @@
 import { IPC_CHANNELS } from '@shared/ipc'
 import * as categoryService from '../../services/categoryService'
 import * as inventoryService from '../../services/inventoryService'
+import * as otherStockService from '../../services/otherStockService'
 import * as productImportService from '../../services/productImportService'
 import * as productService from '../../services/productService'
 import { noInput, registerHandler } from '../registry'
@@ -14,6 +15,8 @@ import {
   productIdSchema,
   productImportCommitSchema,
   productSetActiveSchema,
+  otherStockFiltersSchema,
+  otherStockMovementSchema,
   productUnitsSetSchema,
   productUpdateSchema,
   stockAdjustSchema,
@@ -73,5 +76,17 @@ export function registerCatalogHandlers(): void {
   )
   registerHandler(IPC_CHANNELS.stockMovements, stockMovementFiltersSchema, (filters) =>
     inventoryService.listMovements(filters)
+  )
+
+  // ---- other stock. Owner-only: it is a register of someone else's property.
+  registerHandler(IPC_CHANNELS.otherStockReport, otherStockFiltersSchema, (filters) =>
+    otherStockService.getReport(filters)
+  )
+  registerHandler(IPC_CHANNELS.otherStockOwners, noInput, () => otherStockService.listOwners())
+  registerHandler(IPC_CHANNELS.otherStockReceive, otherStockMovementSchema, (input) =>
+    otherStockService.receiveOtherStock(input)
+  )
+  registerHandler(IPC_CHANNELS.otherStockReturn, otherStockMovementSchema, (input) =>
+    otherStockService.returnOtherStock(input)
   )
 }

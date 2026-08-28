@@ -1,6 +1,6 @@
 import type { JSX } from 'react'
 import { useCallback, useState } from 'react'
-import type { Product, ProductWithUnits } from '@shared/types'
+import type { Ownership, Product, ProductWithUnits } from '@shared/types'
 import { Button } from '../../components/ui/Button'
 import { Checkbox, SearchInput, Select } from '../../components/ui/Field'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
@@ -35,6 +35,7 @@ export function ProductsPage(): JSX.Element {
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [status, setStatus] = useState<Status>('active')
+  const [ownership, setOwnership] = useState<Ownership | 'all'>('all')
   const [lowStockOnly, setLowStockOnly] = useState(false)
 
   const [editing, setEditing] = useState<ProductWithUnits | null>(null)
@@ -47,7 +48,7 @@ export function ProductsPage(): JSX.Element {
 
   const categories = useQuery(() => unwrap(api.categories.list()), [])
 
-  const paging = usePagination([debouncedSearch, categoryId, status, lowStockOnly])
+  const paging = usePagination([debouncedSearch, categoryId, status, ownership, lowStockOnly])
 
   const products = useQuery(
     () =>
@@ -56,12 +57,13 @@ export function ProductsPage(): JSX.Element {
           search: debouncedSearch || undefined,
           categoryId: categoryId ? Number(categoryId) : null,
           status,
+          ownership,
           lowStockOnly,
           limit: paging.limit,
           offset: paging.offset
         })
       ),
-    [debouncedSearch, categoryId, status, lowStockOnly, paging.offset, paging.limit]
+    [debouncedSearch, categoryId, status, ownership, lowStockOnly, paging.offset, paging.limit]
   )
 
   const refresh = useCallback(() => {
@@ -107,7 +109,16 @@ export function ProductsPage(): JSX.Element {
       header: 'Product',
       render: (product) => (
         <PrimaryCell
-          title={product.name}
+          title={
+            product.ownership === 'other' ? (
+              <span className="flex items-center gap-2">
+                {product.name}
+                <Badge tone="neutral">{product.ownerName || 'Other stock'}</Badge>
+              </span>
+            ) : (
+              product.name
+            )
+          }
           subtitle={[product.sku, product.categoryName].filter(Boolean).join(' · ') || undefined}
         />
       )
@@ -137,7 +148,12 @@ export function ProductsPage(): JSX.Element {
       header: `Cost (${currency})`,
       numeric: true,
       width: '120px',
-      render: (product) => format.money(product.costPrice)
+      render: (product) =>
+        product.ownership === 'other' ? (
+          <span className="text-ink-subtle">—</span>
+        ) : (
+          format.money(product.costPrice)
+        )
     },
     {
       key: 'price',
@@ -151,7 +167,14 @@ export function ProductsPage(): JSX.Element {
       header: `Stock value (${currency})`,
       numeric: true,
       width: '150px',
-      render: (product) => format.money(product.stockQty * product.costPrice)
+      // Someone else's goods are worth nothing to this shop, and showing a
+      // figure here would contradict the stock valuation report.
+      render: (product) =>
+        product.ownership === 'other' ? (
+          <span className="text-ink-subtle">—</span>
+        ) : (
+          format.money(product.stockQty * product.costPrice)
+        )
     },
     {
       key: 'status',
@@ -259,6 +282,16 @@ export function ProductsPage(): JSX.Element {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="all">All</option>
+          </Select>
+        </div>
+        <div style={{ width: 160 }}>
+          <Select
+            value={ownership}
+            onChange={(event) => setOwnership(event.target.value as Ownership | 'all')}
+          >
+            <option value="all">All goods</option>
+            <option value="own">My own stock</option>
+            <option value="other">Other stock</option>
           </Select>
         </div>
         <Checkbox

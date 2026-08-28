@@ -4,6 +4,7 @@ import { money, qty as roundQty } from '@shared/money'
 import { Button } from '../../components/ui/Button'
 import { NumberInput, Select } from '../../components/ui/Field'
 import { Column, DataTable } from '../../components/ui/DataTable'
+import { Badge } from '../../components/ui/Feedback'
 import * as format from '../../lib/format'
 import type { BillLine } from './useBill'
 
@@ -96,7 +97,12 @@ export function BillLines({
         const remaining = line.product.stockQty - line.qty * line.factor
         return (
           <div>
-            <div className="font-medium">{line.product.name}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{line.product.name}</span>
+              {line.product.ownership === 'other' && (
+                <Badge tone="neutral">{line.product.ownerName || 'Other stock'}</Badge>
+              )}
+            </div>
             <div className={clsx('text-caption', remaining < 0 ? 'text-bad' : 'text-ink-subtle')}>
               {remaining < 0
                 ? `Short by ${format.qtyWithUnit(-remaining, line.product.baseUnit)}`
