@@ -1,6 +1,7 @@
 import { IPC_CHANNELS } from '@shared/ipc'
 import * as categoryService from '../../services/categoryService'
 import * as inventoryService from '../../services/inventoryService'
+import * as productImportService from '../../services/productImportService'
 import * as productService from '../../services/productService'
 import { noInput, registerHandler } from '../registry'
 import {
@@ -11,6 +12,7 @@ import {
   productFiltersSchema,
   productGetSchema,
   productIdSchema,
+  productImportCommitSchema,
   productSetActiveSchema,
   productUnitsSetSchema,
   productUpdateSchema,
@@ -55,6 +57,14 @@ export function registerCatalogHandlers(): void {
   )
   registerHandler(IPC_CHANNELS.productsUnitsSet, productUnitsSetSchema, ({ productId, units }) =>
     productService.setUnits(productId, units)
+  )
+
+  // ---- bulk import. Absent from the shopkeeper allowlist, so owner-only.
+  registerHandler(IPC_CHANNELS.productsImportPreview, noInput, () =>
+    productImportService.previewImport()
+  )
+  registerHandler(IPC_CHANNELS.productsImportCommit, productImportCommitSchema, ({ token }) =>
+    productImportService.commitImport(token)
   )
 
   // ---- stock

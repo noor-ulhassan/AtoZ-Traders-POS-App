@@ -1,6 +1,13 @@
 import type { JSX } from 'react'
 import { useState } from 'react'
-import type { Customer, Product, RefundType, SaleWithItems, SellableUnit } from '@shared/types'
+import type {
+  Customer,
+  Product,
+  RefundType,
+  Sale,
+  SaleWithItems,
+  SellableUnit
+} from '@shared/types'
 import { today } from '@shared/date'
 import { money as round, sumMoney } from '@shared/money'
 import { Button } from '../../components/ui/Button'
@@ -61,11 +68,11 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
   const customerSearch = usePartySearch('customer', customerQuery)
   const productSearch = useProductSearch(productQuery)
 
-  const invoiceMatches = useQuery(
-    () =>
+  const invoiceMatches = useQuery<Sale[]>(
+    async () =>
       debouncedInvoice.trim().length === 0
-        ? Promise.resolve({ rows: [], total: 0 })
-        : unwrap(api.sales.list({ search: debouncedInvoice.trim(), limit: 8 })),
+        ? []
+        : (await unwrap(api.sales.list({ search: debouncedInvoice.trim(), limit: 8 }))).rows,
     [debouncedInvoice]
   )
 
@@ -257,7 +264,7 @@ export function SaleReturnFormModal({ onClose, onSaved }: SaleReturnFormModalPro
             <Combobox
               query={invoiceQuery}
               onQueryChange={setInvoiceQuery}
-              options={(invoiceMatches.data?.rows ?? []).map((row) => ({
+              options={(invoiceMatches.data ?? []).map((row) => ({
                 value: row,
                 title: row.invoiceNo,
                 subtitle: `${format.date(row.date)} · ${row.customerName ?? 'Walk-in'}`,

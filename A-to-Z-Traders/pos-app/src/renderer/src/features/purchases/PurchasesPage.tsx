@@ -7,12 +7,13 @@ import { Button } from '../../components/ui/Button'
 import { SearchInput } from '../../components/ui/Field'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell, TablePager } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -29,6 +30,8 @@ export function PurchasesPage(): JSX.Element {
 
   const debouncedSearch = useDebounced(search)
 
+  const paging = usePagination([range.from, range.to, debouncedSearch])
+
   const purchases = useQuery(
     () =>
       unwrap(
@@ -36,10 +39,11 @@ export function PurchasesPage(): JSX.Element {
           from: range.from,
           to: range.to,
           search: debouncedSearch || undefined,
-          limit: 300
+          limit: paging.limit,
+          offset: paging.offset
         })
       ),
-    [range.from, range.to, debouncedSearch]
+    [range.from, range.to, debouncedSearch, paging.offset, paging.limit]
   )
 
   const exportCsv = useMutation(
@@ -49,8 +53,11 @@ export function PurchasesPage(): JSX.Element {
   )
 
   const rows = purchases.data?.rows ?? []
-  const total = rows.reduce((sum, row) => sum + row.total, 0)
-  const unpaid = rows.reduce((sum, row) => sum + Math.max(0, row.total - row.paidAmount), 0)
+  // Server-side, over every purchase in the period rather than the open page.
+  const matched = purchases.data?.total ?? 0
+  const total = purchases.data?.totals.total ?? 0
+  const unpaid = purchases.data?.totals.unpaid ?? 0
+  const page = useClampedPage(paging, matched)
 
   const columns: Column<Purchase>[] = [
     { key: 'date', header: 'Date', width: '120px', render: (row) => format.date(row.date) },
@@ -145,7 +152,7 @@ export function PurchasesPage(): JSX.Element {
             value={format.money(unpaid)}
             tone={unpaid > 0 ? 'bad' : 'default'}
           />
-          <StatTile label="Bills recorded" value={rows.length} />
+          <StatTile label="Bills recorded" value={matched} />
         </StatGrid>
 
         <Card>
@@ -167,6 +174,13 @@ export function PurchasesPage(): JSX.Element {
                   </Button>
                 )
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={matched}
+              onPageChange={paging.setPage}
+              noun="purchases"
             />
           </CardBody>
         </Card>

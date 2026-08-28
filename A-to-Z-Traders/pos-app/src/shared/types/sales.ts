@@ -73,3 +73,11 @@ export interface PriceSuggestion {
   rate: number
   source: 'customer_history' | 'unit_default' | 'product_default'
 }
+
+/** Aggregates over every bill the filters match, not just the page shown. */
+export interface SalePageTotals {
+  total: number
+  paid: number
+  /** SUM(MAX(0, total - paid)) — what these bills left on the khata. */
+  onKhata: number
+}

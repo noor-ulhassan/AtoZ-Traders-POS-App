@@ -1,10 +1,11 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   PurchaseReturn,
   PurchaseReturnInput,
   PurchaseReturnWithItems,
   ReturnFilters,
+  ReturnPageTotals,
   SaleReturn,
   SaleReturnInput,
   SaleReturnWithItems
@@ -38,7 +39,9 @@ function productOf<P extends { id: Id }>(lines: { product: P }[], productId: Id)
 
 // ------------------------------------------------------------ sale returns
 
-export function listSaleReturns(filters: ReturnFilters = {}): Page<SaleReturn> {
+export function listSaleReturns(
+  filters: ReturnFilters = {}
+): PageWithTotals<SaleReturn, ReturnPageTotals> {
   return returns.listSaleReturns(getDb(), filters)
 }
 
@@ -172,7 +175,9 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
 
 // -------------------------------------------------------- purchase returns
 
-export function listPurchaseReturns(filters: ReturnFilters = {}): Page<PurchaseReturn> {
+export function listPurchaseReturns(
+  filters: ReturnFilters = {}
+): PageWithTotals<PurchaseReturn, ReturnPageTotals> {
   return returns.listPurchaseReturns(getDb(), filters)
 }
 

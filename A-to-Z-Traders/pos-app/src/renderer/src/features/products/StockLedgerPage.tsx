@@ -6,10 +6,11 @@ import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell, TablePager } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -39,10 +40,24 @@ export function StockLedgerPage(): JSX.Element {
   const [range, setRange] = useState<DateRange>(() => resolvePreset('last30'))
   const [reason, setReason] = useState<ReasonFilter>('all')
 
+  const paging = usePagination([range.from, range.to, reason])
+
   const movements = useQuery(
-    () => unwrap(api.stock.movements({ from: range.from, to: range.to, reason, limit: 500 })),
-    [range.from, range.to, reason]
+    () =>
+      unwrap(
+        api.stock.movements({
+          from: range.from,
+          to: range.to,
+          reason,
+          limit: paging.limit,
+          offset: paging.offset
+        })
+      ),
+    [range.from, range.to, reason, paging.offset, paging.limit]
   )
+
+  const matched = movements.data?.total ?? 0
+  const page = useClampedPage(paging, matched)
 
   const exportCsv = useMutation(
     async () =>
@@ -142,6 +157,13 @@ export function StockLedgerPage(): JSX.Element {
                 title: 'No stock movements in this period',
                 description: 'Purchases, sales, returns and adjustments all appear here.'
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={matched}
+              onPageChange={paging.setPage}
+              noun="movements"
             />
           </CardBody>
         </Card>

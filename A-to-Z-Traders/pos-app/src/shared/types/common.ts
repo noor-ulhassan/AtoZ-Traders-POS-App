@@ -37,3 +37,15 @@ export interface Page<T> {
   rows: T[]
   total: number
 }
+
+/**
+ * A page of rows plus aggregates computed over the WHOLE filtered set.
+ *
+ * List screens show summary tiles above their table. Those tiles must describe
+ * everything the filters match, not the slice currently on screen — so the
+ * numbers are computed in SQL beside the row query, sharing its WHERE clause,
+ * and never by reducing over `rows`.
+ */
+export interface PageWithTotals<T, Totals> extends Page<T> {
+  totals: Totals
+}

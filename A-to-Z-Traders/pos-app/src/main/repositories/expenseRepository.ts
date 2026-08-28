@@ -1,5 +1,13 @@
-import type { Expense, ExpenseCategory, ExpenseFilters, Id, Page } from '@shared/types'
+import type {
+  Expense,
+  ExpenseCategory,
+  ExpenseFilters,
+  ExpensePageTotals,
+  Id,
+  PageWithTotals
+} from '@shared/types'
 import { money } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toText } from '../db/rows'
 
@@ -56,9 +64,12 @@ function buildFilter(filters: ExpenseFilters): { where: string; params: unknown[
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listExpenses(db: Db, filters: ExpenseFilters = {}): Page<Expense> {
+export function listExpenses(
+  db: Db,
+  filters: ExpenseFilters = {}
+): PageWithTotals<Expense, ExpensePageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 200
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -67,11 +78,17 @@ export function listExpenses(db: Db, filters: ExpenseFilters = {}): Page<Expense
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(`SELECT COUNT(*) AS total FROM expenses e ${where}`)
+  const summary = db
+    .prepare<unknown[], { total: number; amount: number | null }>(
+      `SELECT COUNT(*) AS total, SUM(e.amount) AS amount FROM expenses e ${where}`
+    )
     .get(...params)
 
-  return { rows: rows.map(toExpense), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toExpense),
+    total: summary?.total ?? 0,
+    totals: { amount: money(summary?.amount ?? 0) }
+  }
 }
 
 export function findExpense(db: Db, id: Id): Expense | null {

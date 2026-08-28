@@ -1,13 +1,15 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Product,
   ProductFilters,
+  ProductPageTotals,
   ProductUnit,
   ProductUnitInput,
   SellableUnit
 } from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toBool, toText } from '../db/rows'
 
@@ -94,9 +96,12 @@ function buildFilter(filters: ProductFilters): { where: string; params: unknown[
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listProducts(db: Db, filters: ProductFilters = {}): Page<Product> {
+export function listProducts(
+  db: Db,
+  filters: ProductFilters = {}
+): PageWithTotals<Product, ProductPageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 200
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -105,11 +110,20 @@ export function listProducts(db: Db, filters: ProductFilters = {}): Page<Product
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(`SELECT COUNT(*) AS total FROM products p ${where}`)
+  // One pass for the count and the money, over the same WHERE the rows used —
+  // so the tiles above the table describe every match, not the page on screen.
+  const summary = db
+    .prepare<unknown[], { total: number; stock_value: number | null }>(
+      `SELECT COUNT(*) AS total, SUM(p.stock_qty * p.cost_price) AS stock_value
+         FROM products p ${where}`
+    )
     .get(...params)
 
-  return { rows: rows.map(toProduct), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toProduct),
+    total: summary?.total ?? 0,
+    totals: { stockValue: money(summary?.stock_value ?? 0) }
+  }
 }
 
 export function findProduct(db: Db, id: Id): Product | null {

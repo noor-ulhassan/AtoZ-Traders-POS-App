@@ -5,16 +5,24 @@ import { Button } from '../../components/ui/Button'
 import { Checkbox, SearchInput, Select } from '../../components/ui/Field'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell, RowActions } from '../../components/ui/DataTable'
+import {
+  Column,
+  DataTable,
+  PrimaryCell,
+  RowActions,
+  TablePager
+} from '../../components/ui/DataTable'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 import { useCurrency } from '../../app/SettingsContext'
 import { CategoriesModal } from './CategoriesModal'
+import { ProductImportModal } from './ProductImportModal'
 import { ProductFormModal } from './ProductFormModal'
 import { StockAdjustModal } from './StockAdjustModal'
 
@@ -32,11 +40,14 @@ export function ProductsPage(): JSX.Element {
   const [editing, setEditing] = useState<ProductWithUnits | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const [adjusting, setAdjusting] = useState<Product | null>(null)
 
   const debouncedSearch = useDebounced(search)
 
   const categories = useQuery(() => unwrap(api.categories.list()), [])
+
+  const paging = usePagination([debouncedSearch, categoryId, status, lowStockOnly])
 
   const products = useQuery(
     () =>
@@ -45,10 +56,12 @@ export function ProductsPage(): JSX.Element {
           search: debouncedSearch || undefined,
           categoryId: categoryId ? Number(categoryId) : null,
           status,
-          lowStockOnly
+          lowStockOnly,
+          limit: paging.limit,
+          offset: paging.offset
         })
       ),
-    [debouncedSearch, categoryId, status, lowStockOnly]
+    [debouncedSearch, categoryId, status, lowStockOnly, paging.offset, paging.limit]
   )
 
   const refresh = useCallback(() => {
@@ -190,7 +203,11 @@ export function ProductsPage(): JSX.Element {
   ]
 
   const rows = products.data?.rows ?? []
-  const stockValue = rows.reduce((sum, product) => sum + product.stockQty * product.costPrice, 0)
+  const total = products.data?.total ?? 0
+  // Stock value comes from the server, summed over every product the filters
+  // match — reducing over `rows` would only describe the page on screen.
+  const stockValue = products.data?.totals.stockValue ?? 0
+  const page = useClampedPage(paging, total)
 
   return (
     <>
@@ -198,7 +215,7 @@ export function ProductsPage(): JSX.Element {
         title="Products"
         subtitle={
           products.data
-            ? `${format.pluralize(products.data.total, 'product')} · stock worth ${currency} ${format.money(stockValue)}`
+            ? `${format.pluralize(total, 'product')} · stock worth ${currency} ${format.money(stockValue)}`
             : 'Loading'
         }
         actions={
@@ -209,6 +226,9 @@ export function ProductsPage(): JSX.Element {
               onClick={() => void exportCsv.run()}
             >
               Export
+            </Button>
+            <Button icon="restore" onClick={() => setIsImportOpen(true)}>
+              Import
             </Button>
             <Button onClick={() => setIsCategoriesOpen(true)}>Categories</Button>
             <Button variant="primary" icon="plus" onClick={openNew}>
@@ -272,6 +292,13 @@ export function ProductsPage(): JSX.Element {
                 )
               }}
             />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={total}
+              onPageChange={paging.setPage}
+              noun="products"
+            />
           </CardBody>
         </Card>
       </PageBody>
@@ -291,6 +318,10 @@ export function ProductsPage(): JSX.Element {
         categories={categories.data ?? []}
         onChanged={refresh}
       />
+
+      {isImportOpen && (
+        <ProductImportModal onClose={() => setIsImportOpen(false)} onImported={refresh} />
+      )}
 
       {adjusting && (
         <StockAdjustModal

@@ -14,6 +14,7 @@ import type {
   ExpenseCategory,
   ExpenseFilters,
   ExpenseInput,
+  ExpensePageTotals,
   ExportRequest,
   ExportResult,
   Id,
@@ -21,15 +22,21 @@ import type {
   LedgerStatement,
   LowStockRow,
   Page,
+  PageWithTotals,
   PartyFilters,
   PartyInput,
+  PartyPageTotals,
   Payment,
   PaymentFilters,
   PaymentInput,
+  PaymentPageTotals,
   PriceSuggestion,
   Product,
   ProductFilters,
+  ProductImportPreview,
+  ProductImportResult,
   ProductInput,
+  ProductPageTotals,
   ProductProfitRow,
   ProductUnit,
   ProductUnitInput,
@@ -38,6 +45,7 @@ import type {
   Purchase,
   PurchaseFilters,
   PurchaseInput,
+  PurchasePageTotals,
   PurchaseReturn,
   PurchaseReturnInput,
   PurchaseReturnWithItems,
@@ -45,9 +53,11 @@ import type {
   Receipt,
   RestoreResult,
   ReturnFilters,
+  ReturnPageTotals,
   Sale,
   SaleFilters,
   SaleInput,
+  SalePageTotals,
   SaleReturn,
   SaleReturnInput,
   SaleReturnWithItems,
@@ -108,6 +118,8 @@ export const IPC_CHANNELS = {
   productsUnitsList: 'products:units:list',
   productsUnitsSet: 'products:units:set',
   productsSellableUnits: 'products:sellableUnits',
+  productsImportPreview: 'products:import:preview',
+  productsImportCommit: 'products:import:commit',
 
   stockAdjust: 'stock:adjust',
   stockMovements: 'stock:movements',
@@ -210,7 +222,7 @@ export interface PosApi {
   }
 
   products: {
-    list(filters?: ProductFilters): Result<Page<Product>>
+    list(filters?: ProductFilters): Result<PageWithTotals<Product, ProductPageTotals>>
     get(id: Id): Result<ProductWithUnits>
     add(input: ProductInput): Result<Product>
     update(id: Id, input: ProductInput): Result<Product>
@@ -220,6 +232,19 @@ export interface PosApi {
       list(productId: Id): Result<ProductUnit[]>
       set(productId: Id, units: ProductUnitInput[]): Result<ProductUnit[]>
     }
+    /**
+     * Bulk import from a spreadsheet, always in two steps.
+     *
+     * `preview` opens the file picker, parses and validates, and writes
+     * nothing — it returns a per-row account of what committing would do,
+     * plus a token identifying the parsed file. `commit` takes that token, so
+     * the rows written are the rows the main process itself validated, never
+     * a version echoed back from the renderer.
+     */
+    import: {
+      preview(): Result<ProductImportPreview>
+      commit(token: string): Result<ProductImportResult>
+    }
   }
 
   stock: {
@@ -228,7 +253,7 @@ export interface PosApi {
   }
 
   customers: {
-    list(filters?: PartyFilters): Result<Page<Customer>>
+    list(filters?: PartyFilters): Result<PageWithTotals<Customer, PartyPageTotals>>
     get(id: Id): Result<Customer>
     add(input: PartyInput): Result<Customer>
     update(id: Id, input: PartyInput): Result<Customer>
@@ -236,7 +261,7 @@ export interface PosApi {
   }
 
   suppliers: {
-    list(filters?: PartyFilters): Result<Page<Supplier>>
+    list(filters?: PartyFilters): Result<PageWithTotals<Supplier, PartyPageTotals>>
     get(id: Id): Result<Supplier>
     add(input: PartyInput): Result<Supplier>
     update(id: Id, input: PartyInput): Result<Supplier>
@@ -244,13 +269,13 @@ export interface PosApi {
   }
 
   purchases: {
-    list(filters?: PurchaseFilters): Result<Page<Purchase>>
+    list(filters?: PurchaseFilters): Result<PageWithTotals<Purchase, PurchasePageTotals>>
     get(id: Id): Result<PurchaseWithItems>
     create(input: PurchaseInput): Result<PurchaseWithItems>
   }
 
   sales: {
-    list(filters?: SaleFilters): Result<Page<Sale>>
+    list(filters?: SaleFilters): Result<PageWithTotals<Sale, SalePageTotals>>
     get(id: Id): Result<SaleWithItems>
     create(input: SaleInput): Result<{ sale: SaleWithItems; receipt: Receipt }>
     nextInvoiceNo(): Result<string>
@@ -260,12 +285,12 @@ export interface PosApi {
 
   returns: {
     sale: {
-      list(filters?: ReturnFilters): Result<Page<SaleReturn>>
+      list(filters?: ReturnFilters): Result<PageWithTotals<SaleReturn, ReturnPageTotals>>
       get(id: Id): Result<SaleReturnWithItems>
       create(input: SaleReturnInput): Result<SaleReturnWithItems>
     }
     purchase: {
-      list(filters?: ReturnFilters): Result<Page<PurchaseReturn>>
+      list(filters?: ReturnFilters): Result<PageWithTotals<PurchaseReturn, ReturnPageTotals>>
       get(id: Id): Result<PurchaseReturnWithItems>
       create(input: PurchaseReturnInput): Result<PurchaseReturnWithItems>
     }
@@ -273,7 +298,7 @@ export interface PosApi {
 
   payments: {
     create(input: PaymentInput): Result<Payment>
-    list(filters?: PaymentFilters): Result<Page<Payment>>
+    list(filters?: PaymentFilters): Result<PageWithTotals<Payment, PaymentPageTotals>>
     remove(id: Id): Result<{ id: Id }>
   }
 
@@ -282,7 +307,7 @@ export interface PosApi {
       list(): Result<ExpenseCategory[]>
       add(name: string): Result<ExpenseCategory>
     }
-    list(filters?: ExpenseFilters): Result<Page<Expense>>
+    list(filters?: ExpenseFilters): Result<PageWithTotals<Expense, ExpensePageTotals>>
     add(input: ExpenseInput): Result<Expense>
     update(id: Id, input: ExpenseInput): Result<Expense>
     remove(id: Id): Result<{ id: Id }>

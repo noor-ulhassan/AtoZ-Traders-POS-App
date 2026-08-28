@@ -4,10 +4,11 @@ import type { DateRange, PurchaseReturn } from '@shared/types'
 import { resolvePreset } from '@shared/date'
 import { Button } from '../../components/ui/Button'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell } from '../../components/ui/DataTable'
+import { Column, DataTable, PrimaryCell, TablePager } from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -19,13 +20,25 @@ export function PurchaseReturnsPage(): JSX.Element {
   const [range, setRange] = useState<DateRange>(() => resolvePreset('last30'))
   const [isFormOpen, setIsFormOpen] = useState(false)
 
+  const paging = usePagination([range.from, range.to])
+
   const returns = useQuery(
-    () => unwrap(api.returns.purchase.list({ from: range.from, to: range.to, limit: 300 })),
-    [range.from, range.to]
+    () =>
+      unwrap(
+        api.returns.purchase.list({
+          from: range.from,
+          to: range.to,
+          limit: paging.limit,
+          offset: paging.offset
+        })
+      ),
+    [range.from, range.to, paging.offset, paging.limit]
   )
 
   const rows = returns.data?.rows ?? []
-  const total = rows.reduce((sum, row) => sum + row.total, 0)
+  const matched = returns.data?.total ?? 0
+  const total = returns.data?.totals.total ?? 0
+  const page = useClampedPage(paging, matched)
 
   const columns: Column<PurchaseReturn>[] = [
     { key: 'date', header: 'Date', width: '120px', render: (row) => format.date(row.date) },
@@ -73,7 +86,7 @@ export function PurchaseReturnsPage(): JSX.Element {
       <PageBody>
         <StatGrid>
           <StatTile label="Returned in period" unit={currency} value={format.money(total)} />
-          <StatTile label="Returns recorded" value={rows.length} />
+          <StatTile label="Returns recorded" value={matched} />
         </StatGrid>
 
         <Card>
@@ -90,6 +103,13 @@ export function PurchaseReturnsPage(): JSX.Element {
                 description:
                   'Returning goods takes them out of stock and reduces the supplier balance.'
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={matched}
+              onPageChange={paging.setPage}
+              noun="returns"
             />
           </CardBody>
         </Card>

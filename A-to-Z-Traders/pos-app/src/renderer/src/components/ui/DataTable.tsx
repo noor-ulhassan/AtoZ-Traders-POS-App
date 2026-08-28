@@ -1,5 +1,7 @@
 import clsx from 'clsx'
 import type { JSX, ReactNode } from 'react'
+import { pageCount } from '@shared/pagination'
+import { Button } from './Button'
 import { EmptyState, ErrorState } from './Feedback'
 
 /**
@@ -169,4 +171,65 @@ export function RowActions({ children }: { children: ReactNode }): JSX.Element {
 /** Secondary information inside a cell: a SKU under a product name, and so on. */
 export function MutedCell({ children }: { children: ReactNode }): JSX.Element {
   return <span className="text-ink-muted">{children}</span>
+}
+
+interface TablePagerProps {
+  /** 1-based. */
+  page: number
+  pageSize: number
+  /** Rows matching the filters, across every page. */
+  total: number
+  onPageChange: (page: number) => void
+  /** Plural noun for the count, e.g. "products". */
+  noun: string
+}
+
+/**
+ * The strip under a paged table.
+ *
+ * It always states the whole truth — "Showing 51-100 of 1,204 products" — so a
+ * screen can never look like it is showing everything when it is not. That was
+ * the failure this replaces: every list quietly stopped at its query limit and
+ * said nothing.
+ *
+ * Renders nothing when everything already fits on one page, so short lists are
+ * not given furniture they have no use for.
+ */
+export function TablePager({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  noun
+}: TablePagerProps): JSX.Element | null {
+  const pages = pageCount(total, pageSize)
+  if (total <= pageSize) return null
+
+  const first = (page - 1) * pageSize + 1
+  const last = Math.min(page * pageSize, total)
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-sunken px-4 py-2.5">
+      <span className="text-caption text-ink-muted tabular-nums">
+        Showing {first.toLocaleString()}-{last.toLocaleString()} of {total.toLocaleString()} {noun}
+      </span>
+
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          icon="chevronLeft"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </Button>
+        <span className="px-1 text-caption text-ink-muted tabular-nums">
+          Page {page} of {pages}
+        </span>
+        <Button size="sm" disabled={page >= pages} onClick={() => onPageChange(page + 1)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  )
 }

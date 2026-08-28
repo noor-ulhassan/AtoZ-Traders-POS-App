@@ -102,3 +102,10 @@ export interface ReturnFilters {
   limit?: number
   offset?: number
 }
+
+/** Aggregates over every return the filters match, not just the page shown. */
+export interface ReturnPageTotals {
+  total: number
+  /** Sale returns only; always 0 for purchase returns, which have no refund type. */
+  cashRefunds: number
+}

@@ -23,17 +23,18 @@ interface ProductSearch {
 export function useProductSearch(query: string, limit = 12): ProductSearch {
   const debounced = useDebounced(query, 150)
 
-  const result = useQuery(
-    () =>
+  const result = useQuery<Product[]>(
+    async () =>
       debounced.trim().length === 0
-        ? Promise.resolve({ rows: [], total: 0 })
-        : unwrap(api.products.list({ search: debounced.trim(), status: 'active', limit })),
+        ? []
+        : (await unwrap(api.products.list({ search: debounced.trim(), status: 'active', limit })))
+            .rows,
     [debounced, limit]
   )
 
   // Memoised so the empty-result fallback is a stable reference; otherwise a
   // fresh `[]` on every render would invalidate the options below each time.
-  const products = useMemo(() => result.data?.rows ?? [], [result.data])
+  const products = useMemo(() => result.data ?? [], [result.data])
 
   const options = useMemo<ComboOption<Product>[]>(
     () =>

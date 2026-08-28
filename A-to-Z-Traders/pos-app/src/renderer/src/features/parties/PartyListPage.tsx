@@ -6,10 +6,17 @@ import { Button } from '../../components/ui/Button'
 import { Checkbox, SearchInput } from '../../components/ui/Field'
 import { ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell, RowActions } from '../../components/ui/DataTable'
+import {
+  Column,
+  DataTable,
+  PrimaryCell,
+  RowActions,
+  TablePager
+} from '../../components/ui/DataTable'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useDebounced } from '../../hooks/useDebounced'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -71,9 +78,19 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
   const debouncedSearch = useDebounced(search)
   const service = partyType === 'customer' ? api.customers : api.suppliers
 
+  const paging = usePagination([debouncedSearch, withBalanceOnly, partyType])
+
   const parties = useQuery(
-    () => unwrap(service.list({ search: debouncedSearch || undefined, withBalanceOnly })),
-    [debouncedSearch, withBalanceOnly, partyType]
+    () =>
+      unwrap(
+        service.list({
+          search: debouncedSearch || undefined,
+          withBalanceOnly,
+          limit: paging.limit,
+          offset: paging.offset
+        })
+      ),
+    [debouncedSearch, withBalanceOnly, partyType, paging.offset, paging.limit]
   )
 
   const refresh = useCallback(() => parties.refetch(), [parties])
@@ -84,7 +101,9 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
   )
 
   const rows = parties.data?.rows ?? []
-  const outstanding = rows.reduce((sum, party) => sum + Math.max(0, party.currentBalance), 0)
+  const total = parties.data?.total ?? 0
+  const outstanding = parties.data?.totals.outstanding ?? 0
+  const page = useClampedPage(paging, total)
 
   const columns: Column<Customer>[] = [
     {
@@ -231,6 +250,13 @@ export function PartyListPage({ partyType }: PartyListPageProps): JSX.Element {
                   </Button>
                 )
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={total}
+              onPageChange={paging.setPage}
+              noun="records"
             />
           </CardBody>
         </Card>

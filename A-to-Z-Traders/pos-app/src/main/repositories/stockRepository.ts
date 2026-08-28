@@ -6,6 +6,7 @@ import type {
   StockMovementReason
 } from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 
 interface StockMovementRow {
@@ -100,7 +101,7 @@ function buildFilter(filters: StockMovementFilters): { where: string; params: un
 
 export function listMovements(db: Db, filters: StockMovementFilters = {}): Page<StockMovement> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 200
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db

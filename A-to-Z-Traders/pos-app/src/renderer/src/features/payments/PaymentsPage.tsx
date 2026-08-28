@@ -6,12 +6,19 @@ import { Button } from '../../components/ui/Button'
 import { Select } from '../../components/ui/Field'
 import { Badge, ToneValue } from '../../components/ui/Feedback'
 import { Card, CardBody } from '../../components/ui/Surface'
-import { Column, DataTable, PrimaryCell, RowActions } from '../../components/ui/DataTable'
+import {
+  Column,
+  DataTable,
+  PrimaryCell,
+  RowActions,
+  TablePager
+} from '../../components/ui/DataTable'
 import { DateRangeFilter } from '../../components/ui/DateRangeFilter'
 import { StatGrid, StatTile } from '../../components/ui/StatTile'
 import { FilterBar, FilterSpacer, PageBody, PageHeader } from '../../components/layout/PageHeader'
 import { useConfirm } from '../../components/ui/Confirm'
 import { useMutation } from '../../hooks/useMutation'
+import { usePagination, useClampedPage } from '../../hooks/usePagination'
 import { useQuery } from '../../hooks/useQuery'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
@@ -37,6 +44,8 @@ export function PaymentsPage(): JSX.Element {
 
   const effectivePartyType: Filter = isAdmin ? partyType : 'customer'
 
+  const paging = usePagination([range.from, range.to, effectivePartyType])
+
   const payments = useQuery(
     () =>
       unwrap(
@@ -44,10 +53,11 @@ export function PaymentsPage(): JSX.Element {
           from: range.from,
           to: range.to,
           partyType: effectivePartyType,
-          limit: 500
+          limit: paging.limit,
+          offset: paging.offset
         })
       ),
-    [range.from, range.to, effectivePartyType]
+    [range.from, range.to, effectivePartyType, paging.offset, paging.limit]
   )
 
   const exportCsv = useMutation(
@@ -75,8 +85,10 @@ export function PaymentsPage(): JSX.Element {
   }
 
   const rows = payments.data?.rows ?? []
-  const received = rows.filter((p) => p.direction === 'in').reduce((sum, p) => sum + p.amount, 0)
-  const paid = rows.filter((p) => p.direction === 'out').reduce((sum, p) => sum + p.amount, 0)
+  const matched = payments.data?.total ?? 0
+  const received = payments.data?.totals.received ?? 0
+  const paid = payments.data?.totals.paid ?? 0
+  const page = useClampedPage(paging, matched)
 
   const columns: Column<Payment>[] = [
     { key: 'date', header: 'Date', width: '120px', render: (row) => format.date(row.date) },
@@ -218,6 +230,13 @@ export function PaymentsPage(): JSX.Element {
                 description:
                   'Record money received against a khata, or a payment made to a supplier.'
               }}
+            />
+            <TablePager
+              page={page}
+              pageSize={paging.pageSize}
+              total={matched}
+              onPageChange={paging.setPage}
+              noun="payments"
             />
           </CardBody>
         </Card>

@@ -92,3 +92,9 @@ export interface SellableUnit {
   salePrice: number
   isBase: boolean
 }
+
+/** Aggregates over every product the filters match, not just the page shown. */
+export interface ProductPageTotals {
+  /** SUM(stock_qty * cost_price) — what the matching stock is worth at cost. */
+  stockValue: number
+}

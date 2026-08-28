@@ -1,13 +1,15 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Payment,
   PaymentDirection,
   PaymentFilters,
   PaymentMethod,
+  PaymentPageTotals,
   PartyType
 } from '@shared/types'
 import { money } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toText } from '../db/rows'
 
@@ -74,9 +76,12 @@ function buildFilter(filters: PaymentFilters): { where: string; params: unknown[
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listPayments(db: Db, filters: PaymentFilters = {}): Page<Payment> {
+export function listPayments(
+  db: Db,
+  filters: PaymentFilters = {}
+): PageWithTotals<Payment, PaymentPageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 100
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -85,11 +90,23 @@ export function listPayments(db: Db, filters: PaymentFilters = {}): Page<Payment
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(`SELECT COUNT(*) AS total FROM payments pm ${where}`)
+  const summary = db
+    .prepare<unknown[], { total: number; received: number | null; paid: number | null }>(
+      `SELECT COUNT(*)                                             AS total,
+              SUM(CASE WHEN pm.direction = 'in'  THEN pm.amount END) AS received,
+              SUM(CASE WHEN pm.direction = 'out' THEN pm.amount END) AS paid
+         FROM payments pm ${where}`
+    )
     .get(...params)
 
-  return { rows: rows.map(toPayment), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toPayment),
+    total: summary?.total ?? 0,
+    totals: {
+      received: money(summary?.received ?? 0),
+      paid: money(summary?.paid ?? 0)
+    }
+  }
 }
 
 export function findPayment(db: Db, id: Id): Payment | null {

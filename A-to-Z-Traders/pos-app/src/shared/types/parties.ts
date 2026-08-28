@@ -71,3 +71,9 @@ export interface LedgerStatement {
   totalCredit: number
   closingBalance: number
 }
+
+/** Aggregates over every party the filters match, not just the page shown. */
+export interface PartyPageTotals {
+  /** SUM of positive balances: receivable for customers, payable for suppliers. */
+  outstanding: number
+}

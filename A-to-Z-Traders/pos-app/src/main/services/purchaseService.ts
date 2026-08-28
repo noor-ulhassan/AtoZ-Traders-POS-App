@@ -1,9 +1,10 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Purchase,
   PurchaseFilters,
   PurchaseInput,
+  PurchasePageTotals,
   PurchaseWithItems
 } from '@shared/types'
 import { today } from '@shared/date'
@@ -17,7 +18,9 @@ import { recordMovement, weightedAverageCost } from './inventoryService'
 import { requireParty } from './partyService'
 import { requireProduct, resolveUnit } from './productService'
 
-export function listPurchases(filters: PurchaseFilters = {}): Page<Purchase> {
+export function listPurchases(
+  filters: PurchaseFilters = {}
+): PageWithTotals<Purchase, PurchasePageTotals> {
   return purchases.listPurchases(getDb(), filters)
 }
 

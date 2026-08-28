@@ -1,11 +1,12 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   PriceSuggestion,
   Receipt,
   Sale,
   SaleFilters,
   SaleInput,
+  SalePageTotals,
   SaleWithItems
 } from '@shared/types'
 import { today } from '@shared/date'
@@ -20,7 +21,7 @@ import { requireParty } from './partyService'
 import { requireProduct, resolveUnit } from './productService'
 import { getSettings } from './settingsService'
 
-export function listSales(filters: SaleFilters = {}): Page<Sale> {
+export function listSales(filters: SaleFilters = {}): PageWithTotals<Sale, SalePageTotals> {
   return sales.listSales(getDb(), filters)
 }
 

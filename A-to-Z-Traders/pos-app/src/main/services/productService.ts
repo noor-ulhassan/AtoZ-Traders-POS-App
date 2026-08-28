@@ -1,8 +1,9 @@
 import type {
   Id,
-  Page,
+  PageWithTotals,
   Product,
   ProductFilters,
+  ProductPageTotals,
   ProductInput,
   ProductUnit,
   ProductUnitInput,
@@ -17,7 +18,9 @@ import * as products from '../repositories/productRepository'
 import * as stock from '../repositories/stockRepository'
 import { businessRule, conflict, notFound } from '../utils/errors'
 
-export function listProducts(filters: ProductFilters = {}): Page<Product> {
+export function listProducts(
+  filters: ProductFilters = {}
+): PageWithTotals<Product, ProductPageTotals> {
   return products.listProducts(getDb(), filters)
 }
 

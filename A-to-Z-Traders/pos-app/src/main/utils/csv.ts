@@ -133,3 +133,87 @@ export function suggestFileName(report: string, from?: string, to?: string): str
   if (to && to !== from) parts.push(to)
   return `${parts.join('_')}.csv`
 }
+
+// ---------------------------------------------------------------- reading
+
+/**
+ * Parses CSV into rows of raw cell strings.
+ *
+ * Written by hand rather than pulled from a dependency because the shape it
+ * has to survive is narrow and well known: whatever Excel produces when a
+ * wholesaler saves their product list. That means honouring RFC 4180 quoting
+ * (including `""` for a literal quote inside a quoted field), tolerating both
+ * CRLF and LF, and stripping the UTF-8 BOM Excel writes and then chokes on.
+ *
+ * Blank lines are dropped — a trailing newline is normal, and a row of nothing
+ * is never data.
+ */
+export function parseCsv(text: string): string[][] {
+  const input = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let quoted = false
+  let index = 0
+
+  const endField = (): void => {
+    row.push(field)
+    field = ''
+  }
+
+  const endRow = (): void => {
+    endField()
+    // A line that held nothing but separators is not a record.
+    if (row.some((cell) => cell.trim() !== '')) rows.push(row)
+    row = []
+  }
+
+  while (index < input.length) {
+    const char = input[index] as string
+
+    if (quoted) {
+      if (char === '"') {
+        // A doubled quote inside a quoted field is one literal quote.
+        if (input[index + 1] === '"') {
+          field += '"'
+          index += 2
+          continue
+        }
+        quoted = false
+        index += 1
+        continue
+      }
+      field += char
+      index += 1
+      continue
+    }
+
+    if (char === '"' && field === '') {
+      quoted = true
+      index += 1
+      continue
+    }
+
+    if (char === ',') {
+      endField()
+      index += 1
+      continue
+    }
+
+    if (char === '\r' || char === '\n') {
+      endRow()
+      // Consume CRLF as a single terminator.
+      index += char === '\r' && input[index + 1] === '\n' ? 2 : 1
+      continue
+    }
+
+    field += char
+    index += 1
+  }
+
+  // Whatever is still buffered is the last record, unterminated by a newline.
+  if (field !== '' || row.length > 0) endRow()
+
+  return rows
+}

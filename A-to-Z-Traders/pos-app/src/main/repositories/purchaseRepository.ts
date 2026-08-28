@@ -1,5 +1,13 @@
-import type { Id, Page, Purchase, PurchaseFilters, PurchaseItem } from '@shared/types'
+import type {
+  Id,
+  PageWithTotals,
+  Purchase,
+  PurchaseFilters,
+  PurchaseItem,
+  PurchasePageTotals
+} from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toText } from '../db/rows'
 
@@ -88,9 +96,12 @@ function buildFilter(filters: PurchaseFilters): { where: string; params: unknown
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listPurchases(db: Db, filters: PurchaseFilters = {}): Page<Purchase> {
+export function listPurchases(
+  db: Db,
+  filters: PurchaseFilters = {}
+): PageWithTotals<Purchase, PurchasePageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 100
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -99,13 +110,24 @@ export function listPurchases(db: Db, filters: PurchaseFilters = {}): Page<Purch
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(
-      `SELECT COUNT(*) AS total FROM purchases pu LEFT JOIN suppliers s ON s.id = pu.supplier_id ${where}`
+  const summary = db
+    .prepare<unknown[], { total: number; sum_total: number | null; unpaid: number | null }>(
+      `SELECT COUNT(*)                                       AS total,
+              SUM(pu.total)                                  AS sum_total,
+              SUM(MAX(0, ROUND(pu.total - pu.paid_amount, 2))) AS unpaid
+         FROM purchases pu
+         LEFT JOIN suppliers s ON s.id = pu.supplier_id ${where}`
     )
     .get(...params)
 
-  return { rows: rows.map(toPurchase), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toPurchase),
+    total: summary?.total ?? 0,
+    totals: {
+      total: money(summary?.sum_total ?? 0),
+      unpaid: money(summary?.unpaid ?? 0)
+    }
+  }
 }
 
 export function findPurchase(db: Db, id: Id): Purchase | null {

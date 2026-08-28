@@ -69,6 +69,10 @@ const api = {
     units: {
       list: (productId) => invoke(IPC_CHANNELS.productsUnitsList, { productId }),
       set: (productId, units) => invoke(IPC_CHANNELS.productsUnitsSet, { productId, units })
+    },
+    import: {
+      preview: () => invoke(IPC_CHANNELS.productsImportPreview),
+      commit: (token) => invoke(IPC_CHANNELS.productsImportCommit, { token })
     }
   },
 

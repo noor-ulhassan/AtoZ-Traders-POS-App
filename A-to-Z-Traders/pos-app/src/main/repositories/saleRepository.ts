@@ -1,5 +1,14 @@
-import type { Id, Page, PaymentType, Sale, SaleFilters, SaleItem } from '@shared/types'
+import type {
+  Id,
+  PageWithTotals,
+  PaymentType,
+  Sale,
+  SaleFilters,
+  SaleItem,
+  SalePageTotals
+} from '@shared/types'
 import { money, qty } from '@shared/money'
+import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
 import type { Db } from '../db/connection'
 import { toText } from '../db/rows'
 
@@ -105,9 +114,12 @@ function buildFilter(filters: SaleFilters): { where: string; params: unknown[] }
   return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params }
 }
 
-export function listSales(db: Db, filters: SaleFilters = {}): Page<Sale> {
+export function listSales(
+  db: Db,
+  filters: SaleFilters = {}
+): PageWithTotals<Sale, SalePageTotals> {
   const { where, params } = buildFilter(filters)
-  const limit = filters.limit ?? 100
+  const limit = filters.limit ?? DEFAULT_PAGE_SIZE
   const offset = filters.offset ?? 0
 
   const rows = db
@@ -116,13 +128,29 @@ export function listSales(db: Db, filters: SaleFilters = {}): Page<Sale> {
     )
     .all(...params, limit, offset)
 
-  const total = db
-    .prepare<unknown[], { total: number }>(
-      `SELECT COUNT(*) AS total FROM sales s LEFT JOIN customers c ON c.id = s.customer_id ${where}`
+  const summary = db
+    .prepare<
+      unknown[],
+      { total: number; sum_total: number | null; sum_paid: number | null; on_khata: number | null }
+    >(
+      `SELECT COUNT(*)                                    AS total,
+              SUM(s.total)                                AS sum_total,
+              SUM(s.paid_amount)                          AS sum_paid,
+              SUM(MAX(0, ROUND(s.total - s.paid_amount, 2))) AS on_khata
+         FROM sales s
+         LEFT JOIN customers c ON c.id = s.customer_id ${where}`
     )
     .get(...params)
 
-  return { rows: rows.map(toSale), total: total?.total ?? 0 }
+  return {
+    rows: rows.map(toSale),
+    total: summary?.total ?? 0,
+    totals: {
+      total: money(summary?.sum_total ?? 0),
+      paid: money(summary?.sum_paid ?? 0),
+      onKhata: money(summary?.on_khata ?? 0)
+    }
+  }
 }
 
 export function findSale(db: Db, id: Id): Sale | null {

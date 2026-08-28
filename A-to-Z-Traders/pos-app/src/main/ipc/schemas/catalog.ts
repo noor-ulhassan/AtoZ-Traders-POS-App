@@ -55,6 +55,11 @@ export const productGetSchema = z.object({ id: idSchema })
 
 export const productIdSchema = z.object({ productId: idSchema })
 
+/** The commit half of an import names the file the main process already parsed. */
+export const productImportCommitSchema = z.object({
+  token: z.string().uuid('That import is no longer open. Choose the file again.')
+})
+
 export const productUnitsSetSchema = z.object({
   productId: idSchema,
   units: z.array(productUnitSchema).max(20)
