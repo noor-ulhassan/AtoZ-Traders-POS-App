@@ -362,4 +362,20 @@ describe('the on-quit copy', () => {
 
     expect(backupService.listBackups(folder)).toHaveLength(1)
   })
+
+  it('records a failure so it is visible after the app restarts', () => {
+    settingsService.updateSettings({ autoBackupDir: folder })
+    const blocked = join(folder, 'blocked')
+    writeFileSync(blocked, 'not a folder')
+    settingsService.updateSettings({ autoBackupDir: join(blocked, 'inside') })
+
+    // The app is closing, so nobody can be shown an error. It still must not
+    // look healthy afterwards — a backup that quietly stopped working is the
+    // exact failure the health panel exists to catch.
+    expect(() => backupService.runAutoBackup()).not.toThrow()
+
+    const status = backupService.backupStatus()
+    expect(status.health).toBe('failing')
+    expect(status.lastError).toBeTruthy()
+  })
 })

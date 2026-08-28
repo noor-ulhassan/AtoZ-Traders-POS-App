@@ -24,14 +24,23 @@ import { businessRule, conflict, notFound } from '../utils/errors'
  *
  * Consignment goods need a name to settle up with, so 'other' without an owner
  * is refused rather than saved as an anonymous liability. Own stock never
- * carries an owner name, so switching back clears it instead of leaving a
- * stale one behind to confuse a later report.
+ * carries an owner name, so switching back clears it instead of leaving a stale
+ * one behind to confuse a later report.
+ *
+ * `existing` is what the product is today, and both fields fall back to it.
+ * That matters on update: an omitted `ownership` has to mean "leave it alone",
+ * never "make it mine" — otherwise a caller that simply does not know about
+ * consignment could quietly annex somebody else's goods, and an owner name
+ * would have to be re-typed on every unrelated edit.
  */
-function resolveOwnership(input: ProductInput): { ownership: Ownership; ownerName: string } {
-  const ownership = input.ownership ?? 'own'
+function resolveOwnership(
+  input: ProductInput,
+  existing?: { ownership: Ownership; ownerName: string }
+): { ownership: Ownership; ownerName: string } {
+  const ownership = input.ownership ?? existing?.ownership ?? 'own'
   if (ownership !== 'other') return { ownership: 'own', ownerName: '' }
 
-  const ownerName = (input.ownerName ?? '').trim()
+  const ownerName = (input.ownerName ?? existing?.ownerName ?? '').trim()
   if (ownerName === '') {
     throw businessRule('Other stock needs the name of whoever the goods belong to.')
   }
@@ -148,7 +157,7 @@ export function updateProduct(id: Id, input: ProductInput): Product {
     }
   }
 
-  const { ownership, ownerName } = resolveOwnership(input)
+  const { ownership, ownerName } = resolveOwnership(input, existing)
 
   // Whose goods these are decides whether the shelf holds an asset or someone
   // else's property. Flipping that while stock is on the shelf would move a

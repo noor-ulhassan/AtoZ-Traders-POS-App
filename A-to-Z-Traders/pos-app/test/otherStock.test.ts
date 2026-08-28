@@ -110,6 +110,38 @@ describe('setting a product up as consignment stock', () => {
     ).toThrow(/Clear the stock before changing who the goods belong to/i)
   })
 
+  it('stays consignment through an update that never mentions ownership', () => {
+    otherStockService.returnOtherStock({ productId: other.id, qty: 50 })
+
+    // A caller that knows nothing about consignment — an older screen, a script,
+    // a future importer — must not be able to quietly annex somebody's goods by
+    // simply not sending the field.
+    const updated = productService.updateProduct(other.id, {
+      name: 'Imported Blender Mk2',
+      baseUnit: other.baseUnit,
+      costPrice: 0,
+      salePrice: 250,
+      reorderLevel: 0
+    })
+
+    expect(updated.ownership).toBe('other')
+    expect(updated.ownerName).toBe('Bilal Electronics')
+    expect(updated.salePrice).toBe(250)
+  })
+
+  it('keeps the owner name when an edit does not resend it', () => {
+    const updated = productService.updateProduct(other.id, {
+      name: other.name,
+      baseUnit: other.baseUnit,
+      costPrice: 0,
+      salePrice: 210,
+      reorderLevel: 0,
+      ownership: 'other'
+    })
+
+    expect(updated.ownerName).toBe('Bilal Electronics')
+  })
+
   it('can be reclassified once the shelf is empty', () => {
     otherStockService.returnOtherStock({ productId: other.id, qty: 50 })
 

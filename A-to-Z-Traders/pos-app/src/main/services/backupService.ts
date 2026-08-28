@@ -595,7 +595,13 @@ export function runAutoBackup(): void {
     if (!autoBackupDir.trim()) return
     copyDatabaseTo(autoBackupDir)
     pruneBackups(autoBackupDir)
+    session.lastBackupAt = Date.now()
+    session.lastError = null
   } catch (error) {
+    // Recorded as well as logged. The app is closing, so there is nobody to
+    // show an error to now — but the next launch must be able to say that the
+    // last backup did not happen, rather than looking healthy.
+    session.lastError = error instanceof Error ? error.message : String(error)
     log.error('auto-backup failed', error)
   }
 }
