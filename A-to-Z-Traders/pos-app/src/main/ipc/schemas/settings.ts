@@ -16,6 +16,11 @@ export const settingsUpdateSchema = z
     receiptFooter: z.string().trim().max(300),
     logoPath: z.string().trim().max(500),
     currency: z.string().trim().min(1).max(8),
-    autoBackupDir: z.string().trim().max(500)
+    autoBackupDir: z.string().trim().max(500),
+    backupIntervalMinutes: z
+      .number()
+      .int()
+      .min(0, 'Choose how often to back up.')
+      .max(1440, 'Back up at least once a day.')
   })
   .partial()

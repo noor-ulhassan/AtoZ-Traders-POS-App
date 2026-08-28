@@ -4,6 +4,7 @@ import { bootstrapDatabase } from './app/bootstrap'
 import { createMainWindow } from './app/window'
 import { closeDatabase } from './db/connection'
 import { registerIpcHandlers } from './ipc'
+import { startBackupScheduler, stopBackupScheduler } from './app/backupScheduler'
 import { runAutoBackup } from './services/backupService'
 import { logger } from './utils/logger'
 
@@ -45,10 +46,11 @@ if (!hasLock) {
 
     createMainWindow()
 
-    // A shop machine can stay open for weeks. Auto-backup only on clean quit
+    // A shop machine can stay open for weeks. Backing up only on a clean quit
     // would mean a single power cut loses everything since the last close, so
-    // also snapshot on a timer (a no-op unless a backup folder is configured).
-    setInterval(runAutoBackup, SIX_HOURS).unref()
+    // the scheduler also snapshots while the app runs — using SQLite's online
+    // backup, which is safe mid-sale. A no-op until a folder is configured.
+    startBackupScheduler()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
@@ -56,13 +58,12 @@ if (!hasLock) {
   })
 }
 
-const SIX_HOURS = 6 * 60 * 60 * 1000
-
 let shuttingDown = false
 
 app.on('before-quit', () => {
   if (shuttingDown) return
   shuttingDown = true
+  stopBackupScheduler()
   runAutoBackup()
   closeDatabase()
 })
@@ -88,6 +89,7 @@ function handleFatal(label: string, error: unknown): void {
   // here, before the connection is closed. Every completed write is already on
   // disk; this just captures it somewhere safe.
   try {
+    stopBackupScheduler()
     runAutoBackup()
   } catch (backupError) {
     log.error('crash-time auto-backup failed', backupError)

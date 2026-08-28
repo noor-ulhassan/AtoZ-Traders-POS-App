@@ -11,8 +11,16 @@ export interface Settings {
   receiptFooter: string
   logoPath: string
   currency: string
-  /** Copy the database to this folder when the app closes. Empty = disabled. */
+  /**
+   * Where automatic backups are written. Empty turns them off.
+   *
+   * Point this at a folder a cloud client syncs (Google Drive, OneDrive) and
+   * the shop's records survive the machine itself. Never point it at the folder
+   * holding the live database — the app refuses that.
+   */
   autoBackupDir: string
+  /** Minutes between automatic backups. 0 = only when the app closes. */
+  backupIntervalMinutes: number
 }
 
 export type SettingsUpdate = Partial<Settings>

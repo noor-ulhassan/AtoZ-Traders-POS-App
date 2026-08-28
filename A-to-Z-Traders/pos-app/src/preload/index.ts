@@ -161,8 +161,12 @@ const api = {
 
   backup: {
     now: () => invoke(IPC_CHANNELS.backupNow),
+    runNow: () => invoke(IPC_CHANNELS.backupRunNow),
     restore: () => invoke(IPC_CHANNELS.backupRestore),
-    info: () => invoke(IPC_CHANNELS.backupInfo)
+    restoreFrom: (path) => invoke(IPC_CHANNELS.backupRestoreFrom, { path }),
+    info: () => invoke(IPC_CHANNELS.backupInfo),
+    status: () => invoke(IPC_CHANNELS.backupStatus),
+    list: () => invoke(IPC_CHANNELS.backupList)
   },
 
   printing: {

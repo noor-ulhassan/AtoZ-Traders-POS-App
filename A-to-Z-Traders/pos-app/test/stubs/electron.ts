@@ -25,6 +25,9 @@ export const dialog = {
   showOpenDialog: async (): Promise<never> => {
     throw new Error('A native dialog was opened during a test.')
   },
+  showOpenDialogSync: (): never => {
+    throw new Error('A native dialog was opened during a test.')
+  },
   showSaveDialog: async (): Promise<never> => {
     throw new Error('A native dialog was opened during a test.')
   },

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { openDatabase } from '../src/main/db/connection'
 import type { Db } from '../src/main/db/connection'
 import { migrate } from '../src/main/db/migrate'
-import { MIGRATIONS } from '../src/main/db/migrations'
+import { LATEST_VERSION, MIGRATIONS } from '../src/main/db/migrations'
 
 /**
  * The upgrade path, not the fresh install.
@@ -114,10 +114,12 @@ describe('upgrading a live database to 0005', () => {
     expect(() => addProduct(db, 'Shampoo', '111')).toThrow(/UNIQUE/i)
   })
 
-  it('leaves the schema at the latest version', () => {
+  it('carries an old install all the way to the current schema', () => {
     const db = databaseAtVersion(4)
     addProduct(db, 'Soap', '111')
 
-    expect(migrate(db)).toBe(5)
+    // Read from the registry rather than hardcoded, so adding a migration does
+    // not fail a test about the upgrade *path*.
+    expect(migrate(db)).toBe(LATEST_VERSION)
   })
 })

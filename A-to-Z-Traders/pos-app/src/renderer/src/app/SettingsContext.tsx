@@ -22,7 +22,8 @@ const FALLBACK: Settings = {
   receiptFooter: '',
   logoPath: '',
   currency: 'PKR',
-  autoBackupDir: ''
+  autoBackupDir: '',
+  backupIntervalMinutes: 15
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)

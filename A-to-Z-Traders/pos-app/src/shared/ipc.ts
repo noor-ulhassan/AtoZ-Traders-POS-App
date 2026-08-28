@@ -4,7 +4,9 @@ import type {
   AuthResetInput,
   AuthSetupInput,
   AuthStatus,
+  BackupFile,
   BackupResult,
+  BackupStatus,
   Category,
   Customer,
   DashboardSummary,
@@ -176,8 +178,12 @@ export const IPC_CHANNELS = {
   exportCsv: 'export:csv',
 
   backupNow: 'backup:now',
+  backupRunNow: 'backup:runNow',
   backupRestore: 'backup:restore',
+  backupRestoreFrom: 'backup:restoreFrom',
   backupInfo: 'backup:info',
+  backupStatus: 'backup:status',
+  backupList: 'backup:list',
 
   printReceipt: 'printing:receipt',
 
@@ -330,9 +336,19 @@ export interface PosApi {
   }
 
   backup: {
+    /** Pick a folder and save one copy there — a USB stick, say. */
     now(): Result<BackupResult>
+    /** Back up to the configured folder immediately, without a dialog. */
+    runNow(): Result<BackupResult>
+    /** Pick any backup file on this machine and restore it. */
     restore(): Result<RestoreResult>
+    /** Restore one of the backups `list()` returned. */
+    restoreFrom(path: string): Result<RestoreResult>
     info(): Result<DatabaseInfo>
+    /** Whether backups are actually happening, and how recently. */
+    status(): Result<BackupStatus>
+    /** The backups in the configured folder, newest first. */
+    list(): Result<BackupFile[]>
   }
 
   printing: {
