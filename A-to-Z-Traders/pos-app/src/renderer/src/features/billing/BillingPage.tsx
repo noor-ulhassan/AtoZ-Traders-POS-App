@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { Customer, PaymentType, Product, Receipt } from '@shared/types'
 import { today } from '@shared/date'
 import { money as round } from '@shared/money'
@@ -38,24 +39,40 @@ function Kbd({ children }: { children: string }): JSX.Element {
 }
 
 /**
- * The billing screen.
+ * The billing screen — for a new bill, and for editing one already issued.
  *
  * Built to be run from the keyboard: the search box holds focus, a scanner's
  * Enter adds the first match, F4 jumps to the amount received and Ctrl+Enter
  * saves. The totals panel is fixed to the right so the figure the customer is
  * being told never moves.
+ *
+ * Editing (Phase 4b) reuses this screen rather than getting one of its own.
+ * The rules a bill has to satisfy are identical either way — the stock check,
+ * the walk-in rule, the discount cap — and a second bill editor would be a
+ * second place for those rules to drift out of step with the server's. What
+ * changes in edit mode is only the framing: the invoice number is the bill's
+ * own rather than the next one, the screen says what it is about to rewrite,
+ * and the save calls `sales:update` instead of `sales:create`.
  */
 export function BillingPage(): JSX.Element {
   const { settings } = useSettings()
   const confirm = useConfirm()
+  const navigate = useNavigate()
+  const params = useParams()
+  const location = useLocation()
 
-  const bill = useBill({ taxEnabled: settings.taxEnabled, taxRate: settings.taxRate })
+  /** Set when the screen is editing an issued bill rather than writing a new one. */
+  const editingId = params.saleId ? Number(params.saleId) : null
+  /** Set when the owner asked to repeat an old order as a fresh bill. */
+  const repeatSaleId = (location.state as { repeatSaleId?: number } | null)?.repeatSaleId ?? null
+
   const [date, setDate] = useState(today())
   const [productQuery, setProductQuery] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [paymentType, setPaymentType] = useState<PaymentType>('cash')
   const [paidAmount, setPaidAmount] = useState(0)
   const [saved, setSaved] = useState<{ receipt: Receipt; saleId: number } | null>(null)
+  const [reason, setReason] = useState('')
   // Blocks the page's own hotkeys while the "Clear this bill?" confirmation is
   // up — otherwise a reflexive Ctrl+Enter fires `submit()` on the still-intact
   // cart underneath the dialog, saving a sale the owner meant to discard.
@@ -69,7 +86,61 @@ export function BillingPage(): JSX.Element {
 
   const productSearch = useProductSearch(productQuery)
   const customerSearch = usePartySearch('customer', customerQuery)
-  const invoiceNo = useQuery(() => unwrap(api.sales.nextInvoiceNo()), [saved])
+  const invoiceNo = useQuery(
+    () => (editingId != null ? Promise.resolve(null) : unwrap(api.sales.nextInvoiceNo())),
+    [saved, editingId]
+  )
+
+  /* ------------------------------------------- loading an existing bill */
+
+  const sourceId = editingId ?? repeatSaleId
+  const source = useQuery(
+    () => (sourceId == null ? Promise.resolve(null) : unwrap(api.sales.get(sourceId))),
+    [sourceId]
+  )
+  const editing = editingId != null ? source.data : null
+
+  /**
+   * What the bill being edited already took off the shelf.
+   *
+   * Saving reverses the old bill before it re-checks stock, so those quantities
+   * are available to the new version of it. Without this the screen would block
+   * re-saving a bill that sold the last of an item — a shortage the server
+   * would never report.
+   */
+  const stockAllowance = useMemo(() => {
+    const allowance = new Map<number, number>()
+    for (const item of editing?.items ?? []) {
+      allowance.set(item.productId, (allowance.get(item.productId) ?? 0) + item.baseQty)
+    }
+    return allowance
+  }, [editing])
+
+  const bill = useBill({
+    taxEnabled: settings.taxEnabled,
+    taxRate: settings.taxRate,
+    stockAllowance
+  })
+
+  // Fill the screen once, when the bill arrives. The ref is what stops a
+  // re-render from re-loading it and wiping whatever has been typed since.
+  const loadedRef = useRef<number | null>(null)
+  useEffect(() => {
+    const sale = source.data
+    if (!sale || loadedRef.current === sale.id) return
+    loadedRef.current = sale.id
+
+    void bill.load(sale, { keepRates: editingId != null, keepCustomer: true }).then(() => {
+      if (editingId == null) return
+      // An edit starts from exactly what was saved, including the money: the
+      // owner is correcting one thing, not re-entering the bill.
+      setDate(sale.date)
+      setPaymentType(sale.paymentType)
+      setPaidAmount(sale.paidAmount)
+    })
+    // `bill` is rebuilt every render; loading is keyed on the sale, not on it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source.data, editingId])
 
   const { totals } = bill
 
@@ -107,34 +178,39 @@ export function BillingPage(): JSX.Element {
 
   const save = useMutation(
     async () => {
-      const result = await unwrap(
-        api.sales.create({
-          customerId: bill.customer?.id ?? null,
-          date,
-          // Send the capped discount the totals panel is showing — not the raw
-          // keyed figure. A discount typed larger than the subtotal is displayed
-          // (and saved) as the subtotal; sending the raw value instead made the
-          // server reject a bill whose on-screen total looked perfectly valid.
-          discount: totals.discount,
-          paymentType,
-          paidAmount: paidNow,
-          notes: bill.notes || null,
-          items: bill.lines.map((line) => ({
-            productId: line.product.id,
-            unitName: line.unitName,
-            qty: line.qty,
-            rate: line.rate,
-            lineDiscount: line.lineDiscount
-          }))
-        })
-      )
-      return result
+      const payload = {
+        customerId: bill.customer?.id ?? null,
+        date,
+        // Send the capped discount the totals panel is showing — not the raw
+        // keyed figure. A discount typed larger than the subtotal is displayed
+        // (and saved) as the subtotal; sending the raw value instead made the
+        // server reject a bill whose on-screen total looked perfectly valid.
+        discount: totals.discount,
+        paymentType,
+        paidAmount: paidNow,
+        notes: bill.notes || null,
+        items: bill.lines.map((line) => ({
+          productId: line.product.id,
+          unitName: line.unitName,
+          qty: line.qty,
+          rate: line.rate,
+          lineDiscount: line.lineDiscount
+        }))
+      }
+
+      return editingId != null
+        ? await unwrap(api.sales.update({ id: editingId, ...payload, reason: reason || null }))
+        : await unwrap(api.sales.create(payload))
     },
     {
-      errorTitle: 'Could not save the bill',
+      errorTitle: editingId != null ? 'Could not save the changes' : 'Could not save the bill',
       onSuccess: (result) => {
         if (!result) return
         setSaved({ receipt: result.receipt, saleId: result.sale.id })
+        // An edited bill stays on screen behind its corrected receipt; closing
+        // that receipt returns to the sales list. A new bill clears for the
+        // next customer, which is what the counter needs.
+        if (editingId != null) return
         bill.reset()
         setPaymentType('cash')
         setPaidAmount(0)
@@ -143,7 +219,12 @@ export function BillingPage(): JSX.Element {
     }
   )
 
-  const canSave = bill.lines.length > 0 && bill.shortages.length === 0 && !save.isPending
+  const canSave =
+    bill.lines.length > 0 &&
+    bill.shortages.length === 0 &&
+    !save.isPending &&
+    !bill.isLoading &&
+    !editing?.voidedAt
 
   const submit = async (): Promise<void> => {
     if (!canSave) return
@@ -155,12 +236,25 @@ export function BillingPage(): JSX.Element {
     if (bill.lines.length === 0 || confirmingClear) return
     setConfirmingClear(true)
     try {
-      const ok = await confirm({
-        title: 'Clear this bill?',
-        message: 'The items entered so far will be discarded.',
-        confirmLabel: 'Clear bill',
-        destructive: true
-      })
+      const ok = await confirm(
+        editing
+          ? {
+              title: 'Discard these changes?',
+              message: `Invoice ${editing.invoiceNo} will be left exactly as it is.`,
+              confirmLabel: 'Discard changes',
+              destructive: true
+            }
+          : {
+              title: 'Clear this bill?',
+              message: 'The items entered so far will be discarded.',
+              confirmLabel: 'Clear bill',
+              destructive: true
+            }
+      )
+      if (ok && editing) {
+        navigate('/sales')
+        return
+      }
       if (ok) {
         bill.reset()
         setPaidAmount(0)
@@ -217,10 +311,10 @@ export function BillingPage(): JSX.Element {
         <div className="flex shrink-0 items-center gap-4 border-b border-line px-5 py-3">
           <div>
             <span className="block text-micro font-semibold tracking-[0.07em] text-ink-subtle uppercase">
-              Invoice
+              {editing ? 'Editing invoice' : 'Invoice'}
             </span>
             <span className="font-mono text-base font-semibold tracking-[-0.01em]">
-              {invoiceNo.data ?? '—'}
+              {editing?.invoiceNo ?? invoiceNo.data ?? '—'}
             </span>
           </div>
           <div className="flex-1" />
@@ -231,9 +325,26 @@ export function BillingPage(): JSX.Element {
             </div>
           </label>
           <Button icon="trash" onClick={() => void clearBill()} disabled={bill.lines.length === 0}>
-            Clear
+            {editing ? 'Discard changes' : 'Clear'}
           </Button>
         </div>
+
+        {editing && (
+          <div className="shrink-0 border-b border-line px-5 pt-4">
+            {editing.voidedAt ? (
+              <Callout tone="bad" title={`Invoice ${editing.invoiceNo} was cancelled`}>
+                A cancelled bill cannot be changed — its goods are already back in stock and nothing
+                on it is owed. Raise a new bill instead.
+              </Callout>
+            ) : (
+              <Callout tone="warn" title={`You are rewriting invoice ${editing.invoiceNo}`}>
+                Saving replaces the bill under the same invoice number. Stock, the customer&apos;s
+                khata and every report move with it, and the bill as it stands now is kept in its
+                history.
+              </Callout>
+            )}
+          </div>
+        )}
 
         <div className="shrink-0 border-b border-line px-5 py-4">
           <Combobox
@@ -437,6 +548,18 @@ export function BillingPage(): JSX.Element {
                 onChange={(event) => bill.setNotes(event.target.value)}
               />
             </Field>
+
+            {editing && (
+              <div className="mt-3">
+                <Field label="Reason for the change" hint="Kept with the bill's history">
+                  <Input
+                    value={reason}
+                    placeholder="e.g. Two cartons came back at the door"
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                </Field>
+              </div>
+            )}
           </div>
 
           {bill.shortages.length > 0 && (
@@ -445,7 +568,7 @@ export function BillingPage(): JSX.Element {
                 {bill.shortages
                   .map(
                     (shortage) =>
-                      `${shortage.product.name}: ${format.quantity(shortage.product.stockQty)} in stock, bill needs ${format.quantity(shortage.needed)}`
+                      `${shortage.product.name}: ${format.quantity(shortage.available)} available, bill needs ${format.quantity(shortage.needed)}`
                   )
                   .join('. ')}
                 .
@@ -471,7 +594,8 @@ export function BillingPage(): JSX.Element {
             disabled={!canSave || needsCustomer}
             onClick={() => void submit()}
           >
-            Save bill · {settings.currency} {format.money(totals.total)}
+            {editing ? 'Save changes' : 'Save bill'} · {settings.currency}{' '}
+            {format.money(totals.total)}
           </Button>
         </div>
       </aside>
@@ -480,7 +604,10 @@ export function BillingPage(): JSX.Element {
         receipt={saved?.receipt ?? null}
         saleId={saved?.saleId ?? null}
         justSaved
-        onClose={() => setSaved(null)}
+        onClose={() => {
+          setSaved(null)
+          if (editingId != null) navigate('/sales')
+        }}
       />
     </div>
   )

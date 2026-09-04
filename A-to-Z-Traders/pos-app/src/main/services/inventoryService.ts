@@ -33,6 +33,26 @@ export function recordMovement(db: Db, input: MovementInput): Id {
 }
 
 /**
+ * Takes back every movement one document made, cache included.
+ *
+ * The mirror image of `recordMovement`, and the plumbing Phase 4 needed: an
+ * edited or voided bill reverses its own effect on the shelf before the new
+ * version is written, in the same transaction. Because the reversal happens
+ * first, the re-issued bill's stock check needs no special case — it simply
+ * sees the shelf as it was before the original sale.
+ *
+ * The caller must already be inside a transaction.
+ */
+export function removeMovementsFor(db: Db, refTable: string, refId: Id): void {
+  // Sum first: once the rows are gone there is nothing left to reverse from.
+  const totals = stock.sumMovementsByRef(db, refTable, refId)
+  stock.deleteMovementsFor(db, refTable, refId)
+  for (const total of totals) {
+    products.applyStockDelta(db, total.productId, qty(-total.changeQty))
+  }
+}
+
+/**
  * Recomputes the weighted-average cost after stock comes in (Guide §4).
  *
  *   new_avg = (stock_qty * cost_price + qty_in * cost_in) / (stock_qty + qty_in)

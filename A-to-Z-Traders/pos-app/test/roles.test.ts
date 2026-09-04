@@ -154,6 +154,10 @@ describe('access policy (fail-closed)', () => {
     expect(isAuthorized(IPC_CHANNELS.otherStockReport, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.otherStockReceive, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.otherStockReturn, {})).toBe(false)
+    // Rewriting or cancelling an issued bill moves stock and restates what a
+    // past day earned. Settling one — money only — is allowed; these are not.
+    expect(isAuthorized(IPC_CHANNELS.salesUpdate, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.salesVoid, {})).toBe(false)
     // Backups: the folder, the copies, and the ability to replace everything.
     expect(isAuthorized(IPC_CHANNELS.backupStatus, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.backupList, {})).toBe(false)
@@ -184,6 +188,11 @@ describe('access policy (fail-closed)', () => {
       IPC_CHANNELS.salesSuggestPrice,
       IPC_CHANNELS.salesReceipt,
       IPC_CHANNELS.printReceipt,
+      // Opened deliberately with Phase 4: recording what a delivered bill was
+      // actually paid is the same money a shopkeeper already handles. Editing
+      // and voiding a bill are not, and stay owner-only below.
+      IPC_CHANNELS.salesSettle,
+      IPC_CHANNELS.salesRevisions,
       IPC_CHANNELS.saleReturnsList,
       IPC_CHANNELS.saleReturnsGet,
       IPC_CHANNELS.saleReturnsCreate,

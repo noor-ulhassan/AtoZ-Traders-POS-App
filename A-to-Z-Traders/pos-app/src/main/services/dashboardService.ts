@@ -46,9 +46,12 @@ function recentSales(limit = 8): RecentSaleRow[] {
         payment_type: string
       }
     >(
+      // Cancelled bills are left out: they carry nothing, and a row of zeroes
+      // in "recent sales" reads as a bug rather than as history.
       `SELECT s.id, s.invoice_no, c.name AS customer_name, s.date, s.total, s.payment_type
          FROM sales s
          LEFT JOIN customers c ON c.id = s.customer_id
+        WHERE s.voided_at IS NULL
         ORDER BY s.id DESC
         LIMIT ?`
     )

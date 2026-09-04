@@ -261,6 +261,23 @@ export function soldBaseQty(db: Db, saleId: Id, productId: Id): number {
   return qty(row?.total ?? 0)
 }
 
+/**
+ * True once anything has been returned against a bill.
+ *
+ * Editing or voiding underneath a return would corrupt both: a return captures
+ * the cost from the original line and caps itself against what that bill sold,
+ * so rewriting the bill leaves the return quoting a line that no longer
+ * exists. Both operations refuse while one is on file.
+ */
+export function hasReturnsForSale(db: Db, saleId: Id): boolean {
+  const row = db
+    .prepare<[Id], { present: number }>(
+      'SELECT EXISTS(SELECT 1 FROM sale_returns WHERE sale_id = ?) AS present'
+    )
+    .get(saleId)
+  return row?.present === 1
+}
+
 // -------------------------------------------------------- purchase returns
 
 /** Base quantity a purchase brought in for a product, to cap over-returns. */

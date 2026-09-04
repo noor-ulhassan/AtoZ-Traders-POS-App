@@ -66,9 +66,13 @@ import type {
   SaleFilters,
   SaleInput,
   SalePageTotals,
+  SaleRevision,
   SaleReturn,
   SaleReturnInput,
   SaleReturnWithItems,
+  SaleSettleInput,
+  SaleUpdateInput,
+  SaleVoidInput,
   SaleWithItems,
   SalesSummaryReport,
   SecurityQuestion,
@@ -159,6 +163,10 @@ export const IPC_CHANNELS = {
   salesNextInvoiceNo: 'sales:nextInvoiceNo',
   salesSuggestPrice: 'sales:suggestPrice',
   salesReceipt: 'sales:receipt',
+  salesSettle: 'sales:settle',
+  salesUpdate: 'sales:update',
+  salesVoid: 'sales:void',
+  salesRevisions: 'sales:revisions',
 
   saleReturnsList: 'returns:sale:list',
   saleReturnsGet: 'returns:sale:get',
@@ -315,6 +323,13 @@ export interface PosApi {
     nextInvoiceNo(): Result<string>
     suggestPrice(customerId: Id | null, productId: Id, unitName: string): Result<PriceSuggestion>
     receipt(saleId: Id): Result<Receipt>
+    /** Record what was actually paid on a delivered bill. Money only. */
+    settle(input: SaleSettleInput): Result<SaleWithItems>
+    /** Re-issue a changed bill under its original invoice number. */
+    update(input: SaleUpdateInput): Result<{ sale: SaleWithItems; receipt: Receipt }>
+    /** Cancel a bill: stock back, figures zeroed, number retained. */
+    void(input: SaleVoidInput): Result<SaleWithItems>
+    revisions(saleId: Id): Result<SaleRevision[]>
   }
 
   returns: {

@@ -76,6 +76,42 @@ export const saleFiltersSchema = z
   .optional()
   .transform((value) => value ?? {})
 
+/**
+ * Editing a bill re-states it in full, so the payload is the create payload
+ * plus the bill it replaces. Anything the schema lets through is still
+ * re-priced and re-checked by `salesService.priceBill` exactly as a new bill
+ * is; nothing here is trusted as final.
+ */
+export const saleUpdateSchema = z.object({
+  input: z.object({
+    id: idSchema,
+    customerId: optionalIdSchema.optional(),
+    date: isoDateSchema.optional(),
+    items: z.array(saleItemSchema).min(1, 'Add at least one item to the bill.').max(500),
+    discount: moneySchema.optional(),
+    paymentType: z.enum(['cash', 'credit', 'partial']),
+    paidAmount: moneySchema,
+    notes: optionalText(500),
+    reason: optionalText(200)
+  })
+})
+
+export const saleSettleSchema = z.object({
+  input: z.object({
+    id: idSchema,
+    /** The new total received against the bill, not the extra amount. */
+    paidAmount: moneySchema,
+    reason: optionalText(200)
+  })
+})
+
+export const saleVoidSchema = z.object({
+  input: z.object({
+    id: idSchema,
+    reason: optionalText(200)
+  })
+})
+
 export const suggestPriceSchema = z.object({
   customerId: optionalIdSchema,
   productId: idSchema,

@@ -88,7 +88,10 @@ function buildDataset(report: ExportName, filters: ExportFilters, currency: stri
             value: (r) => csvMoney(r.total - r.paidAmount),
             sum: (r) => r.total - r.paidAmount
           },
-          { header: 'Payment type', value: (r) => r.paymentType },
+          // A cancelled bill exports as a row of zeroes, which is correct — but
+          // "cash" beside them would read as a paid bill for nothing. Say what
+          // it is instead; the sums are unaffected either way.
+          { header: 'Payment type', value: (r) => (r.voidedAt ? 'Cancelled' : r.paymentType) },
           { header: 'Notes', value: (r) => r.notes }
         ],
         listSales({ from, to, customerId: filters.partyId ?? null, limit: LIMIT }).rows
