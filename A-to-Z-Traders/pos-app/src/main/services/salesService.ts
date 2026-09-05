@@ -147,7 +147,13 @@ function priceBill(
     const lineQty = qty(item.qty)
     const baseQty = qty(lineQty * unit.factor)
     const lineDiscount = money(item.lineDiscount ?? 0)
-    const gross = money(lineQty * item.rate)
+    // The rate is rounded ONCE, here, and everything below is priced from the
+    // rounded figure — because that is the figure that gets stored and
+    // printed. Multiplying by the rate as typed instead left a receipt whose
+    // own line did not add up: 3 x 1000.005 stored a rate of 1000.01 beside an
+    // amount of 3000.02, and a customer checking the paper got 3000.03.
+    const rate = money(item.rate)
+    const gross = money(lineQty * rate)
 
     if (lineDiscount > gross) {
       throw businessRule(`The discount on "${product.name}" is more than the line total.`)
@@ -161,7 +167,7 @@ function priceBill(
       factor: unit.factor,
       qty: lineQty,
       baseQty,
-      rate: money(item.rate),
+      rate,
       lineDiscount,
       // Cost is frozen onto the line so profit is fixed at sale time and
       // unaffected by later purchases (Guide §1.8). Consignment goods have no

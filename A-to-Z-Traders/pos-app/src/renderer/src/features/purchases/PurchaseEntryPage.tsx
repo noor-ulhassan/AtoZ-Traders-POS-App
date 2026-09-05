@@ -32,6 +32,21 @@ interface Line {
 }
 
 /**
+ * Same treatment as the bill lines, for the same reason.
+ *
+ * Under the default `auto` table layout an `<input>` asks for about 180px
+ * whatever `w-full` says, so the sized columns overran their declared widths,
+ * the table burst its card into a horizontal scrollbar, and Item was left with
+ * 77px — the product name coming out one word per line. `table-fixed` makes
+ * the declared widths hold; the trimmed padding and the wrapped headers are
+ * what let six sized columns and a usable Item column fit the card at all.
+ */
+const GRID =
+  '[&_table]:table-fixed [&_table]:min-w-[600px] ' +
+  '[&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-4 [&_td:first-child]:pl-4 ' +
+  '[&_select]:pl-2 [&_select]:pr-7 [&_th]:whitespace-normal [&_th]:leading-tight'
+
+/**
  * Recording stock coming in.
  *
  * Cost is entered per purchased unit — a supplier bills "1 carton = 1,200",
@@ -139,13 +154,11 @@ export function PurchaseEntryPage(): JSX.Element {
     {
       key: 'unit',
       header: 'Unit',
-      width: '140px',
+      // Wide enough for a unit carrying its factor: a select clips rather than
+      // ellipsising, and 'carton (1' would read as a different pack size.
+      width: '124px',
       render: (line) => (
-        <Select
-          className="min-w-[110px]"
-          value={line.unitName}
-          onChange={(event) => changeUnit(line, event.target.value)}
-        >
+        <Select value={line.unitName} onChange={(event) => changeUnit(line, event.target.value)}>
           {line.units.map((unit) => (
             <option key={unit.unitName} value={unit.unitName}>
               {unit.unitName}
@@ -159,7 +172,7 @@ export function PurchaseEntryPage(): JSX.Element {
       key: 'qty',
       header: 'Quantity',
       numeric: true,
-      width: '120px',
+      width: '72px',
       render: (line) => (
         <NumberInput
           value={line.qty}
@@ -171,7 +184,7 @@ export function PurchaseEntryPage(): JSX.Element {
       key: 'cost',
       header: `Cost per unit (${currency})`,
       numeric: true,
-      width: '160px',
+      width: '100px',
       render: (line) => (
         <NumberInput
           value={line.unitCost}
@@ -183,7 +196,7 @@ export function PurchaseEntryPage(): JSX.Element {
       key: 'base',
       header: 'Adds to stock',
       numeric: true,
-      width: '130px',
+      width: '76px',
       render: (line) => (
         <span style={{ color: 'var(--ink-muted)' }}>
           {format.qtyWithUnit(line.qty * line.factor, line.product.baseUnit)}
@@ -194,7 +207,7 @@ export function PurchaseEntryPage(): JSX.Element {
       key: 'amount',
       header: `Amount (${currency})`,
       numeric: true,
-      width: '140px',
+      width: '96px',
       render: (line) => <strong>{format.money(line.qty * line.unitCost)}</strong>
     },
     {
@@ -252,6 +265,7 @@ export function PurchaseEntryPage(): JSX.Element {
 
             <CardBody flush>
               <DataTable
+                className={GRID}
                 columns={columns}
                 rows={lines}
                 rowKey={(line) => line.key}

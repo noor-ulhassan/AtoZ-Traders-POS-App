@@ -142,6 +142,16 @@ export function insertExpenseCategory(db: Db, name: string): Id {
   return Number(info.lastInsertRowid)
 }
 
+/** By name, compared the way a person reads it. See `findCategoryByName`. */
+export function findExpenseCategoryByName(db: Db, name: string): ExpenseCategory | null {
+  const row = db
+    .prepare<[string], { id: number; name: string }>(
+      'SELECT id, name FROM expense_categories WHERE name = ? COLLATE NOCASE'
+    )
+    .get(name.trim())
+  return row ? { id: row.id, name: row.name } : null
+}
+
 export function findExpenseCategory(db: Db, id: Id): ExpenseCategory | null {
   const row = db
     .prepare<[Id], { id: number; name: string }>(

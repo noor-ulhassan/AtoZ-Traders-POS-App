@@ -8,6 +8,8 @@ import { logger } from '../utils/logger'
 import { computeBalance } from './ledgerService'
 import { reconcileStockCache } from './inventoryService'
 import { applyBalanceDelta } from '../repositories/partyRepository'
+import { findCategoryByName } from '../repositories/categoryRepository'
+import { findExpenseCategoryByName } from '../repositories/expenseRepository'
 import * as categoryService from './categoryService'
 import * as expenseService from './expenseService'
 import * as inventoryService from './inventoryService'
@@ -96,6 +98,40 @@ const DISPLAY_ORDER: DemoTable[] = [
   'expenses',
   'staff_users'
 ]
+
+/**
+ * A category the samples need, reusing one the shop already has.
+ *
+ * Both category tables have a UNIQUE name, and the names here are the obvious
+ * ones: 'Grocery' is the first category seeded and the one a kiryana
+ * wholesaler is most likely to have typed on day one, and 'Rent' and
+ * 'Electricity' are the first expenses anybody records. Inserting blindly
+ * meant the whole seed was refused — cleanly, but with a message that named
+ * nothing and offered no way forward — on exactly the shops most likely to
+ * want to try the samples out.
+ *
+ * A reused category is deliberately NOT recorded as a demo row. Removing the
+ * samples must never take a category the shop owns, along with whatever it has
+ * since filed under it.
+ */
+function seedCategory(db: Db, name: string): Id {
+  const existing = findCategoryByName(db, name)
+  if (existing) return existing.id
+
+  const category = categoryService.addCategory(name)
+  record(db, 'categories', category.id)
+  return category.id
+}
+
+/** The same, for expense categories. */
+function seedExpenseCategory(db: Db, name: string): Id {
+  const existing = findExpenseCategoryByName(db, name)
+  if (existing) return existing.id
+
+  const category = expenseService.addExpenseCategory(name)
+  record(db, 'expense_categories', category.id)
+  return category.id
+}
 
 function record(db: Db, table: DemoTable, rowId: Id): void {
   db.prepare('INSERT OR IGNORE INTO demo_records (table_name, row_id) VALUES (?, ?)').run(
@@ -365,11 +401,7 @@ export function seedDemoData(): DemoSeedResult {
 
   const run = db.transaction(() => {
     // ---- categories -------------------------------------------------------
-    const categoryIds = CATEGORIES.map((name) => {
-      const category = categoryService.addCategory(name)
-      record(db, 'categories', category.id)
-      return category.id
-    })
+    const categoryIds = CATEGORIES.map((name) => seedCategory(db, name))
 
     // ---- products ---------------------------------------------------------
     // 20 items x 4 brands = 80, comfortably past one page.
@@ -661,11 +693,7 @@ export function seedDemoData(): DemoSeedResult {
     }
 
     // ---- expenses ----------------------------------------------------------
-    const expenseCategoryIds = EXPENSE_CATEGORIES.map((name) => {
-      const category = expenseService.addExpenseCategory(name)
-      record(db, 'expense_categories', category.id)
-      return category.id
-    })
+    const expenseCategoryIds = EXPENSE_CATEGORIES.map((name) => seedExpenseCategory(db, name))
 
     // Overheads for a shop turning over roughly this much: together they should
     // take a healthy bite out of gross profit without swallowing it. Set too

@@ -32,6 +32,19 @@ export function findCategory(db: Db, id: Id): Category | null {
   return row ? toCategory(row) : null
 }
 
+/**
+ * Look a category up by name, the way a person reads it rather than the way
+ * the UNIQUE index compares it — "grocery" and "Grocery" are the same category
+ * to a shopkeeper. Used by the sample-data seeder to reuse what a shop already
+ * has instead of trying to insert a second one.
+ */
+export function findCategoryByName(db: Db, name: string): Category | null {
+  const row = db
+    .prepare<[string], CategoryRow>(`${SELECT} WHERE c.name = ? COLLATE NOCASE`)
+    .get(name.trim())
+  return row ? toCategory(row) : null
+}
+
 export function insertCategory(db: Db, name: string): Id {
   const info = db.prepare('INSERT INTO categories (name) VALUES (?)').run(name)
   return Number(info.lastInsertRowid)

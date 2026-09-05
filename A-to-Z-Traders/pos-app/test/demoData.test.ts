@@ -10,6 +10,7 @@ import * as purchaseService from '../src/main/services/purchaseService'
 import * as reportService from '../src/main/services/reportService'
 import * as salesService from '../src/main/services/salesService'
 import * as expenseService from '../src/main/services/expenseService'
+import * as categoryService from '../src/main/services/categoryService'
 
 /**
  * Sample data has to be trustworthy in two directions.
@@ -314,6 +315,59 @@ describe('living beside the shop’s own records', () => {
 
     expect(stockDrift()).toBe(0)
     expect(balanceDrift()).toBe(0)
+  })
+
+  /**
+   * A shop that has been trading for a week already has a "Grocery" category
+   * and a "Rent" expense — both names the seeder wants, and both columns are
+   * UNIQUE. Inserting blindly refused the whole seed on exactly the shops most
+   * likely to press the button.
+   */
+  it('seeds into a shop that already uses the category names it wants', () => {
+    const own = categoryService.addCategory('Grocery')
+    const ownExpense = expenseService.addExpenseCategory('Rent')
+
+    expect(() => demoDataService.seedDemoData()).not.toThrow()
+    expect(demoDataService.demoStatus().present).toBe(true)
+
+    // One category, not two — the shop's own, reused.
+    const grocery = categoryService
+      .listCategories()
+      .filter((category) => category.name.toLowerCase() === 'grocery')
+    expect(grocery).toHaveLength(1)
+    expect(grocery[0]?.id).toBe(own.id)
+
+    const rent = expenseService
+      .listExpenseCategories()
+      .filter((category) => category.name.toLowerCase() === 'rent')
+    expect(rent).toHaveLength(1)
+    expect(rent[0]?.id).toBe(ownExpense.id)
+  })
+
+  it('matches a category name the way a person reads it, not the index', () => {
+    const own = categoryService.addCategory('grocery')
+
+    demoDataService.seedDemoData()
+
+    // "grocery" and "Grocery" would both satisfy the UNIQUE index, and the
+    // shop would end up looking at two of what it thinks is one category.
+    expect(
+      categoryService.listCategories().filter((c) => c.name.toLowerCase() === 'grocery')
+    ).toHaveLength(1)
+    expect(categoryService.listCategories().find((c) => c.id === own.id)?.name).toBe('grocery')
+  })
+
+  it('leaves a reused category behind when the samples are removed', () => {
+    const own = categoryService.addCategory('Grocery')
+    const ownExpense = expenseService.addExpenseCategory('Rent')
+
+    demoDataService.seedDemoData()
+    demoDataService.clearDemoData()
+
+    // The categories are the shop's, so removing the samples must not take
+    // them — nor anything the shop has since filed under them.
+    expect(categoryService.listCategories().map((c) => c.id)).toEqual([own.id])
+    expect(expenseService.listExpenseCategories().map((c) => c.id)).toEqual([ownExpense.id])
   })
 
   it('refuses to remove samples the shop’s own records now depend on', () => {
