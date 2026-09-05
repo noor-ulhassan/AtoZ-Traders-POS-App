@@ -12,6 +12,9 @@ import {
   saleFiltersSchema,
   saleIdSchema,
   saleReturnCreateSchema,
+  saleSettleSchema,
+  saleUpdateSchema,
+  saleVoidSchema,
   suggestPriceSchema
 } from '../schemas/trade'
 
@@ -40,6 +43,18 @@ export function registerTradeHandlers(): void {
     salesService.suggestPrice(input.customerId, input.productId, input.unitName)
   )
   registerHandler(IPC_CHANNELS.salesReceipt, saleIdSchema, ({ id }) => salesService.getReceipt(id))
+  registerHandler(IPC_CHANNELS.salesSettle, saleSettleSchema, ({ input }) =>
+    salesService.settleSale(input)
+  )
+  registerHandler(IPC_CHANNELS.salesUpdate, saleUpdateSchema, ({ input }) =>
+    salesService.updateSale(input)
+  )
+  registerHandler(IPC_CHANNELS.salesVoid, saleVoidSchema, ({ input }) =>
+    salesService.voidSale(input)
+  )
+  registerHandler(IPC_CHANNELS.salesRevisions, saleIdSchema, ({ id }) =>
+    salesService.listSaleRevisions(id)
+  )
 
   // ---- returns
   registerHandler(IPC_CHANNELS.saleReturnsList, returnFiltersSchema, (filters) =>

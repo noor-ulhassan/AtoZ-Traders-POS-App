@@ -5,7 +5,10 @@ import type {
   Sale,
   SaleFilters,
   SaleItem,
-  SalePageTotals
+  SalePageTotals,
+  SaleRevision,
+  SaleRevisionAction,
+  SaleRevisionSnapshot
 } from '@shared/types'
 import { money, qty } from '@shared/money'
 import { DEFAULT_PAGE_SIZE } from '@shared/pagination'
@@ -32,6 +35,7 @@ interface SaleRow {
   payment_type: PaymentType
   notes: string | null
   created_at: string
+  voided_at: string | null
 }
 
 interface SaleItemRow {
@@ -64,7 +68,8 @@ const toSale = (row: SaleRow): Sale => ({
   paidAmount: row.paid_amount,
   paymentType: row.payment_type,
   notes: toText(row.notes),
-  createdAt: row.created_at
+  createdAt: row.created_at,
+  voidedAt: row.voided_at
 })
 
 const toItem = (row: SaleItemRow): SaleItem => ({
@@ -266,6 +271,139 @@ export function insertSaleItem(db: Db, fields: SaleItemFields): Id {
       money(fields.amount)
     )
   return Number(info.lastInsertRowid)
+}
+
+// ------------------------------------------------------- editing a bill
+
+/**
+ * Re-states a saved bill's header. The invoice number is deliberately absent:
+ * an edited bill keeps the number that was printed and handed to the customer,
+ * so there is exactly one piece of paper per number, always.
+ */
+export function updateSaleHeader(
+  db: Db,
+  id: Id,
+  fields: Omit<SaleHeaderFields, 'invoiceNo'>
+): void {
+  db.prepare(
+    `UPDATE sales
+        SET customer_id = ?, date = ?, subtotal = ?, other_subtotal = ?, discount = ?,
+            tax = ?, total = ?, paid_amount = ?, payment_type = ?, notes = ?
+      WHERE id = ?`
+  ).run(
+    fields.customerId,
+    fields.date,
+    money(fields.subtotal),
+    money(fields.otherSubtotal),
+    money(fields.discount),
+    money(fields.tax),
+    money(fields.total),
+    money(fields.paidAmount),
+    fields.paymentType,
+    fields.notes,
+    id
+  )
+}
+
+/** The settle path: money only, nothing about the goods. */
+export function updateSalePayment(
+  db: Db,
+  id: Id,
+  paidAmount: number,
+  paymentType: PaymentType
+): void {
+  db.prepare('UPDATE sales SET paid_amount = ?, payment_type = ? WHERE id = ?').run(
+    money(paidAmount),
+    paymentType,
+    id
+  )
+}
+
+export function deleteSaleItems(db: Db, saleId: Id): void {
+  db.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(saleId)
+}
+
+/** Stamps the cancellation. The caller has already zeroed the figures. */
+export function markVoided(db: Db, id: Id): void {
+  db.prepare("UPDATE sales SET voided_at = datetime('now','localtime') WHERE id = ?").run(id)
+}
+
+/** Bills that have been cancelled, so the two COUNT aggregates can skip them. */
+export function isVoided(db: Db, id: Id): boolean {
+  const row = db
+    .prepare<[Id], { voided: number }>(
+      'SELECT (voided_at IS NOT NULL) AS voided FROM sales WHERE id = ?'
+    )
+    .get(id)
+  return row?.voided === 1
+}
+
+// ------------------------------------------------------ revision history
+
+interface SaleRevisionRow {
+  id: number
+  sale_id: number
+  revision: number
+  action: SaleRevisionAction
+  changed_by: string
+  reason: string | null
+  snapshot: string
+  created_at: string
+}
+
+export interface SaleRevisionFields {
+  saleId: Id
+  action: SaleRevisionAction
+  changedBy: string
+  reason: string | null
+  snapshot: SaleRevisionSnapshot
+}
+
+/**
+ * Files the bill as it stood before a change.
+ *
+ * The revision number is read inside the caller's transaction, exactly like
+ * `nextInvoiceNo` — SQLite's writer lock is what makes that safe.
+ */
+export function insertRevision(db: Db, fields: SaleRevisionFields): Id {
+  const previous = db
+    .prepare<[Id], { highest: number | null }>(
+      'SELECT MAX(revision) AS highest FROM sale_revisions WHERE sale_id = ?'
+    )
+    .get(fields.saleId)
+
+  const info = db
+    .prepare(
+      `INSERT INTO sale_revisions (sale_id, revision, action, changed_by, reason, snapshot)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      fields.saleId,
+      (previous?.highest ?? 0) + 1,
+      fields.action,
+      fields.changedBy,
+      fields.reason,
+      JSON.stringify(fields.snapshot)
+    )
+  return Number(info.lastInsertRowid)
+}
+
+export function listRevisions(db: Db, saleId: Id): SaleRevision[] {
+  return db
+    .prepare<[Id], SaleRevisionRow>(
+      `SELECT * FROM sale_revisions WHERE sale_id = ? ORDER BY revision DESC`
+    )
+    .all(saleId)
+    .map((row) => ({
+      id: row.id,
+      saleId: row.sale_id,
+      revision: row.revision,
+      action: row.action,
+      changedBy: row.changed_by,
+      reason: toText(row.reason),
+      snapshot: JSON.parse(row.snapshot) as SaleRevisionSnapshot,
+      createdAt: row.created_at
+    }))
 }
 
 // -------------------------------------------------- remembered pricing

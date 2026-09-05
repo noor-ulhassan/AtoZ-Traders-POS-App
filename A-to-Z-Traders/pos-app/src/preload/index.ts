@@ -117,7 +117,11 @@ const api = {
     nextInvoiceNo: () => invoke(IPC_CHANNELS.salesNextInvoiceNo),
     suggestPrice: (customerId, productId, unitName) =>
       invoke(IPC_CHANNELS.salesSuggestPrice, { customerId, productId, unitName }),
-    receipt: (id) => invoke(IPC_CHANNELS.salesReceipt, { id })
+    receipt: (id) => invoke(IPC_CHANNELS.salesReceipt, { id }),
+    settle: (input) => invoke(IPC_CHANNELS.salesSettle, { input }),
+    update: (input) => invoke(IPC_CHANNELS.salesUpdate, { input }),
+    void: (input) => invoke(IPC_CHANNELS.salesVoid, { input }),
+    revisions: (saleId) => invoke(IPC_CHANNELS.salesRevisions, { id: saleId })
   },
 
   returns: {

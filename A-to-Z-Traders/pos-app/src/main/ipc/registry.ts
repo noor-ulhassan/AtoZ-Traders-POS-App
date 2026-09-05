@@ -55,6 +55,14 @@ const SHOPKEEPER_CHANNELS: Partial<Record<IpcChannel, PayloadRule>> = {
   [IPC_CHANNELS.salesReceipt]: true,
   [IPC_CHANNELS.printReceipt]: true,
 
+  // Record what a delivered bill was actually paid, and read a bill's edit
+  // history. Settling is money the shopkeeper already handles - it is the same
+  // act as taking a customer receipt, just booked against the bill it came
+  // with. EDITING and VOIDING a bill are NOT here: they move stock and rewrite
+  // what a past day earned, which is the owner's decision.
+  [IPC_CHANNELS.salesSettle]: true,
+  [IPC_CHANNELS.salesRevisions]: true,
+
   // Take goods back from a customer.
   [IPC_CHANNELS.saleReturnsList]: true,
   [IPC_CHANNELS.saleReturnsGet]: true,

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import type { Customer, PriceSuggestion, Product, SellableUnit } from '@shared/types'
+import type { Customer, PriceSuggestion, Product, SaleWithItems, SellableUnit } from '@shared/types'
 import { money, percentOf, qty as roundQty, sumMoney } from '@shared/money'
 import { api, unwrap } from '../../lib/api'
 
@@ -28,12 +28,38 @@ export interface BillTotals {
 interface UseBillOptions {
   taxEnabled: boolean
   taxRate: number
+  /**
+   * Base quantities the screen may count as already back on the shelf, keyed
+   * by product id.
+   *
+   * Only used when editing an issued bill. The saved bill's own deduction is
+   * still in `products.stock_qty`, but saving reverses it before it re-checks
+   * anything (`salesService.updateSale`) — so without this the screen would
+   * refuse to re-save a bill that sold the last of an item, for a shortage the
+   * server would never see. The allowance keeps the warning honest in both
+   * directions: adding MORE than the bill originally took still warns.
+   */
+  stockAllowance?: Map<number, number>
+}
+
+export interface LoadOptions {
+  /**
+   * Keep the rates the bill was saved with (an edit), or re-ask for today's
+   * suggested price (repeating an order weeks later). Editing must keep them:
+   * a rate the owner negotiated is the one thing an edit must not silently
+   * change under him.
+   */
+  keepRates?: boolean
+  /** Also adopt the saved bill's customer. */
+  keepCustomer?: boolean
 }
 
 /** A product the bill asks for more of than the shelf holds. */
 export interface BillShortage {
   product: Product
   needed: number
+  /** What the save will actually have to draw on, allowance included. */
+  available: number
 }
 
 export interface Bill {
@@ -44,6 +70,9 @@ export interface Bill {
   updateLine: (key: number, patch: Partial<BillLine>) => void
   changeUnit: (line: BillLine, unitName: string, customerId: number | null) => Promise<void>
   removeLine: (key: number) => void
+  /** Fills the bill from a saved one — used to edit it, or to repeat it. */
+  load: (sale: SaleWithItems, options?: LoadOptions) => Promise<void>
+  isLoading: boolean
   discount: number
   setDiscount: (discount: number) => void
   notes: string
@@ -61,11 +90,12 @@ export interface Bill {
  * `salesService` exactly; the server still recomputes everything, but the
  * screen must never show a total that the save then disagrees with.
  */
-export function useBill({ taxEnabled, taxRate }: UseBillOptions): Bill {
+export function useBill({ taxEnabled, taxRate, stockAllowance }: UseBillOptions): Bill {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [lines, setLines] = useState<BillLine[]>([])
   const [discount, setDiscount] = useState(0)
   const [notes, setNotes] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const nextKey = useRef(1)
 
   const totals = useMemo<BillTotals>(() => {
@@ -175,6 +205,75 @@ export function useBill({ taxEnabled, taxRate }: UseBillOptions): Bill {
     setNotes('')
   }, [])
 
+  /**
+   * Fills the bill from one that is already saved.
+   *
+   * Each line is rebuilt from the *current* product and unit list rather than
+   * from the saved row alone, because the screen needs the live stock figure
+   * to warn about shortages and the live unit list for the unit dropdown. The
+   * quantity, rate and line discount come from the saved bill.
+   *
+   * A line whose product has since been deleted is skipped rather than
+   * crashing the screen; the owner sees a shorter bill and can re-add it.
+   */
+  const load = useCallback(
+    async (sale: SaleWithItems, options: LoadOptions = {}): Promise<void> => {
+      setIsLoading(true)
+      try {
+        const loaded = await Promise.all(
+          sale.items.map(async (item): Promise<BillLine | null> => {
+            try {
+              const [product, units] = await Promise.all([
+                unwrap(api.products.get(item.productId)),
+                unwrap(api.products.sellableUnits(item.productId))
+              ])
+              const unit =
+                units.find((candidate) => candidate.unitName === item.unitName) ??
+                (units[0] as SellableUnit)
+
+              let rate = item.rate
+              if (!options.keepRates) {
+                const suggestion = await unwrap(
+                  api.sales.suggestPrice(
+                    options.keepCustomer ? sale.customerId : null,
+                    product.id,
+                    unit.unitName
+                  )
+                )
+                rate = suggestion.rate
+              }
+
+              return {
+                key: nextKey.current++,
+                product,
+                units,
+                unitName: unit.unitName,
+                factor: unit.factor,
+                qty: item.qty,
+                rate,
+                lineDiscount: options.keepRates ? item.lineDiscount : 0,
+                priceSource: options.keepRates ? 'customer_history' : 'product_default'
+              }
+            } catch {
+              return null
+            }
+          })
+        )
+
+        setLines(loaded.filter((line): line is BillLine => line !== null))
+        setDiscount(options.keepRates ? sale.discount : 0)
+        setNotes(options.keepRates ? (sale.notes ?? '') : '')
+
+        if (options.keepCustomer && sale.customerId != null) {
+          setCustomer(await unwrap(api.customers.get(sale.customerId)))
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    []
+  )
+
   /** Lines asking for more than is on the shelf, checked before saving. */
   const shortages = useMemo(() => {
     const needed = new Map<number, number>()
@@ -183,16 +282,20 @@ export function useBill({ taxEnabled, taxRate }: UseBillOptions): Bill {
       needed.set(line.product.id, roundQty((needed.get(line.product.id) ?? 0) + baseQty))
     }
 
+    const available = (product: Product): number =>
+      roundQty(product.stockQty + (stockAllowance?.get(product.id) ?? 0))
+
     return lines
       .filter(
         (line, index, all) => all.findIndex((l) => l.product.id === line.product.id) === index
       )
-      .filter((line) => (needed.get(line.product.id) ?? 0) > roundQty(line.product.stockQty))
+      .filter((line) => (needed.get(line.product.id) ?? 0) > available(line.product))
       .map((line) => ({
         product: line.product,
-        needed: needed.get(line.product.id) ?? 0
+        needed: needed.get(line.product.id) ?? 0,
+        available: available(line.product)
       }))
-  }, [lines])
+  }, [lines, stockAllowance])
 
   return {
     customer,
@@ -202,6 +305,8 @@ export function useBill({ taxEnabled, taxRate }: UseBillOptions): Bill {
     updateLine,
     changeUnit,
     removeLine,
+    load,
+    isLoading,
     discount,
     setDiscount,
     notes,

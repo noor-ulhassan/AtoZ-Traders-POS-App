@@ -66,8 +66,16 @@ export function profitAndLoss(range: DateRange): ProfitLossReport {
     'SELECT SUM(tax) AS value FROM sales WHERE date BETWEEN @from AND @to',
     params
   )
+  // Every money figure above sums a zero for a cancelled bill, so none of them
+  // needed a filter. A COUNT does not: a void bill would still be counted as a
+  // bill, which is the one thing a cancelled bill is not.
   const billCount = Math.round(
-    scalar(db, 'SELECT COUNT(*) AS value FROM sales WHERE date BETWEEN @from AND @to', params)
+    scalar(
+      db,
+      `SELECT COUNT(*) AS value FROM sales
+        WHERE date BETWEEN @from AND @to AND voided_at IS NULL`,
+      params
+    )
   )
   const cogs = scalar(
     db,
@@ -224,7 +232,7 @@ export function salesSummary(range: DateRange): SalesSummaryReport {
               SELECT sale_id, SUM(cost_price * base_qty) AS cogs
                 FROM sale_items WHERE is_other = 0 GROUP BY sale_id
          ) line ON line.sale_id = s.id
-        WHERE s.date BETWEEN @from AND @to
+        WHERE s.date BETWEEN @from AND @to AND s.voided_at IS NULL
         GROUP BY s.date
         ORDER BY s.date`
     )

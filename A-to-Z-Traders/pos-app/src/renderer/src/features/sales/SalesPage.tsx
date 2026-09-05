@@ -108,7 +108,7 @@ export function SalesPage(): JSX.Element {
       numeric: true,
       width: '150px',
       render: (sale) => {
-        const due = sale.total - sale.paidAmount
+        const due = sale.voidedAt ? 0 : sale.total - sale.paidAmount
         return due > 0.005 ? (
           <ToneValue tone="bad">{format.money(due)}</ToneValue>
         ) : (
@@ -120,11 +120,17 @@ export function SalesPage(): JSX.Element {
       key: 'status',
       header: 'Status',
       width: '120px',
-      render: (sale) => (
-        <Badge tone={PAYMENT_BADGE[sale.paymentType].tone}>
-          {PAYMENT_BADGE[sale.paymentType].label}
-        </Badge>
-      )
+      // A cancelled bill still sits in the list, carrying nothing. Saying so
+      // here is the whole point: the invoice number was handed to a customer,
+      // so it has to be findable, and it must not read as an unpaid bill.
+      render: (sale) =>
+        sale.voidedAt ? (
+          <Badge tone="bad">Cancelled</Badge>
+        ) : (
+          <Badge tone={PAYMENT_BADGE[sale.paymentType].tone}>
+            {PAYMENT_BADGE[sale.paymentType].label}
+          </Badge>
+        )
     }
   ]
 
@@ -237,7 +243,16 @@ export function SalesPage(): JSX.Element {
         </Card>
       </PageBody>
 
-      <SaleDetailModal saleId={openId} onClose={() => setOpenId(null)} />
+      <SaleDetailModal
+        saleId={openId}
+        onClose={() => setOpenId(null)}
+        onChanged={() => {
+          // Settling, editing or cancelling changes the row, the summary tiles
+          // and the khata figure, so the whole list is re-read.
+          void sales.refetch()
+          void summary.refetch()
+        }}
+      />
     </>
   )
 }

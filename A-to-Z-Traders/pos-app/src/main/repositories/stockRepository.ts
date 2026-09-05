@@ -69,6 +69,46 @@ export function insertMovement(db: Db, input: MovementInput): Id {
   return Number(info.lastInsertRowid)
 }
 
+/**
+ * What one document's movements did to each product, signed and in base units.
+ *
+ * `(ref_table, ref_id)` addresses a whole document's movements as a set —
+ * which is what makes a bill reversible: sum this, delete them, and apply the
+ * inverse to the cache. See `deleteMovementsFor`.
+ */
+export function sumMovementsByRef(
+  db: Db,
+  refTable: string,
+  refId: Id
+): { productId: Id; changeQty: number }[] {
+  return db
+    .prepare<[string, Id], { product_id: number; change_qty: number }>(
+      `SELECT product_id, SUM(change_qty) AS change_qty
+         FROM stock_movements
+        WHERE ref_table = ? AND ref_id = ?
+        GROUP BY product_id`
+    )
+    .all(refTable, refId)
+    .map((row) => ({ productId: row.product_id, changeQty: qty(row.change_qty) }))
+}
+
+/**
+ * Erases one document's movements from the ledger.
+ *
+ * The only deleting path in a table that is otherwise append-only, and it
+ * exists for exactly one reason: a bill that is edited or voided must not
+ * leave its old movements behind, or the shelf quantity would drift by the
+ * amount of every edit ever made. It does NOT touch `products.stock_qty` —
+ * always call it through `inventoryService.removeMovementsFor`, which moves
+ * the cache with it, so the ledger and its cache can never part company.
+ */
+export function deleteMovementsFor(db: Db, refTable: string, refId: Id): number {
+  const info = db
+    .prepare('DELETE FROM stock_movements WHERE ref_table = ? AND ref_id = ?')
+    .run(refTable, refId)
+  return info.changes
+}
+
 const SELECT = `
   SELECT m.*, p.name AS product_name
     FROM stock_movements m

@@ -45,6 +45,17 @@ export function AppRoutes(): JSX.Element {
       <Route element={<AppShell />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/billing" element={<BillingPage />} />
+        {/* The same screen in edit mode. Owner-only: rewriting an issued bill
+            moves stock and restates what a past day earned. The main process
+            refuses `sales:update` for a shopkeeper regardless. */}
+        <Route
+          path="/billing/:saleId/edit"
+          element={
+            <Guarded feature="editBill">
+              <BillingPage />
+            </Guarded>
+          }
+        />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/returns/sale" element={<SaleReturnsPage />} />
         <Route

@@ -12,6 +12,8 @@ import type { UserRole } from '@shared/types'
 export type Feature =
   | 'dashboard'
   | 'billing'
+  /** Rewriting or cancelling a bill that has already been issued. */
+  | 'editBill'
   | 'sales'
   | 'saleReturns'
   | 'purchaseReturns'
