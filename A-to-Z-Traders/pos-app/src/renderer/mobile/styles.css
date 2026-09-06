@@ -1,0 +1,168 @@
+@import 'tailwindcss';
+@import '../src/styles/tokens.css';
+
+/* The companion app's own components, plus the design tokens it shares. */
+@source '.';
+
+/* ==========================================================================
+   The phone's stylesheet
+   --------------------------------------------------------------------------
+   The same tokens as the desktop, bound the same way — `@theme inline`, so a
+   colour still resolves through `var(--token)` and the dark palette keeps
+   working by redefining one variable. Sharing the tokens is what stops the two
+   halves of this application drifting into looking like two products.
+
+   What is NOT shared is the sizing. A shop counter is a mouse at arm's length;
+   a phone is a thumb, often a wet or dusty one, in a hurry. So the type scale
+   and the control heights below are the phone's own — 16px base (any smaller
+   and iOS zooms the page the moment a field is focused) and a 48px minimum
+   tap target throughout.
+   ========================================================================== */
+
+@theme inline {
+  --color-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+  --shadow-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+
+  --color-paper: var(--paper);
+  --color-canvas: var(--canvas);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-weak: var(--accent-weak);
+  --color-accent-border: var(--accent-border);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-good: var(--good);
+  --color-good-weak: var(--good-weak);
+  --color-good-border: var(--good-border);
+
+  --color-bad: var(--bad);
+  --color-bad-weak: var(--bad-weak);
+  --color-bad-border: var(--bad-border);
+
+  --color-warn: var(--warn);
+  --color-warn-weak: var(--warn-weak);
+  --color-warn-border: var(--warn-border);
+
+  --color-info: var(--info);
+  --color-info-weak: var(--info-weak);
+
+  --color-nav-bg: var(--nav-bg);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-ink-strong: var(--nav-ink-strong);
+  --color-nav-ink-muted: var(--nav-ink-muted);
+  --color-nav-line: var(--nav-line);
+
+  --font-ui: var(--family-ui);
+  --font-mono: var(--family-mono);
+
+  /* The phone's scale. 16px base is a hard floor, not a preference: below it
+     iOS Safari zooms into any focused input and the layout jumps. */
+  --text-micro: 12px;
+  --text-micro--line-height: 1.4;
+  --text-caption: 13px;
+  --text-caption--line-height: 1.4;
+  --text-sm: 14px;
+  --text-sm--line-height: 1.45;
+  --text-base: 16px;
+  --text-base--line-height: 1.5;
+  --text-md: 18px;
+  --text-md--line-height: 1.4;
+  --text-lg: 22px;
+  --text-lg--line-height: 1.25;
+  --text-xl: 28px;
+  --text-xl--line-height: 1.2;
+
+  --shadow-card: var(--elevation-card);
+  --shadow-popover: var(--elevation-popover);
+}
+
+@layer base {
+  :root {
+    /* The tab bar has to clear the home indicator on a modern phone, and sit
+       flush on one without. The safe-area inset is the only thing that knows
+       which, so every fixed bar below reads it rather than guessing. */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --tabbar-height: 60px;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--family-ui);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    /* A till is tapped, not read: a stray text selection from a long-press on
+       a row is never what was meant. Inputs opt back in below. */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Chrome's tap flash lands on the wrong element in a list of cards. */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  input,
+  textarea,
+  select,
+  [data-selectable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    /* Every button in this app is at least a thumb wide. */
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  /* Number fields are typed into with the numeric keypad; the spinner arrows
+     only ever steal a tap. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring-tight);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

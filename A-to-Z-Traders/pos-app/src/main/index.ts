@@ -5,6 +5,7 @@ import { createMainWindow } from './app/window'
 import { closeDatabase } from './db/connection'
 import { registerIpcHandlers } from './ipc'
 import { startBackupScheduler, stopBackupScheduler } from './app/backupScheduler'
+import { stopMobileServer, syncMobileServer } from './mobile/server'
 import { runAutoBackup } from './services/backupService'
 import { logger } from './utils/logger'
 
@@ -52,6 +53,11 @@ if (!hasLock) {
     // backup, which is safe mid-sale. A no-op until a folder is configured.
     startBackupScheduler()
 
+    // Phone access, if the owner has switched it on. A no-op otherwise, and it
+    // reads the saved settings rather than being told — the same arrangement
+    // the backup scheduler uses, so there is one copy of "is this on".
+    void syncMobileServer()
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
     })
@@ -64,6 +70,10 @@ app.on('before-quit', () => {
   if (shuttingDown) return
   shuttingDown = true
   stopBackupScheduler()
+  // Not awaited: `before-quit` does not wait for promises, exactly as the
+  // synchronous backup below relies on. Closing the listener is best-effort —
+  // the process is about to end, which closes the socket regardless.
+  void stopMobileServer()
   runAutoBackup()
   closeDatabase()
 })
@@ -90,6 +100,7 @@ function handleFatal(label: string, error: unknown): void {
   // disk; this just captures it somewhere safe.
   try {
     stopBackupScheduler()
+    void stopMobileServer()
     runAutoBackup()
   } catch (backupError) {
     log.error('crash-time auto-backup failed', backupError)

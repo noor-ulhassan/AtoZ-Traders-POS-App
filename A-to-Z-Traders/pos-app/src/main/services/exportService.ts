@@ -414,7 +414,24 @@ function generatedStamp(): string {
   return row?.t ?? today()
 }
 
-export async function exportCsv(request: ExportRequest): Promise<ExportResult> {
+/** A finished report: what to call the file, what is in it, and how big. */
+export interface CsvExport {
+  fileName: string
+  csv: string
+  rowCount: number
+}
+
+/**
+ * Builds a report and returns it as text, touching neither a dialog nor the
+ * disk.
+ *
+ * Split out of `exportCsv` so the same report can be produced for a caller
+ * that has nowhere to put a file: the companion app on the phone downloads it
+ * through the browser instead. The rules that decide what a report CONTAINS
+ * must not depend on where it is going, so they live here, once, and
+ * `exportCsv` below is only the "save it to disk" half.
+ */
+export function buildCsvExport(request: ExportRequest): CsvExport {
   const filters = (request.filters ?? {}) as ExportFilters
   const settings = getSettings()
   const currency = settings.currency
@@ -437,9 +454,19 @@ export async function exportCsv(request: ExportRequest): Promise<ExportResult> {
     ]
   }
 
+  return {
+    fileName: suggestFileName(request.report, filters.from, filters.to),
+    csv: toReportCsv(heading, data.columns, data.rows as never[]),
+    rowCount: data.rows.length
+  }
+}
+
+export async function exportCsv(request: ExportRequest): Promise<ExportResult> {
+  const built = buildCsvExport(request)
+
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Save export',
-    defaultPath: suggestFileName(request.report, filters.from, filters.to),
+    defaultPath: built.fileName,
     filters: [{ name: 'CSV (Excel)', extensions: ['csv'] }]
   })
 
@@ -447,6 +474,6 @@ export async function exportCsv(request: ExportRequest): Promise<ExportResult> {
     throw new AppError('CANCELLED', 'Export cancelled.')
   }
 
-  writeFileSync(filePath, toReportCsv(heading, data.columns, data.rows as never[]), 'utf8')
-  return { path: filePath, rowCount: data.rows.length }
+  writeFileSync(filePath, built.csv, 'utf8')
+  return { path: filePath, rowCount: built.rowCount }
 }

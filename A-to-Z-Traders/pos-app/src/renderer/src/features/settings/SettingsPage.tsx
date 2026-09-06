@@ -16,6 +16,7 @@ import { useSettings } from '../../app/SettingsContext'
 import { ChangePasswordModal } from '../auth/ChangePasswordModal'
 import { BackupPanel } from './BackupPanel'
 import { DemoDataPanel } from './DemoDataPanel'
+import { MobileAccessPanel } from './MobileAccessPanel'
 
 interface InfoRowProps {
   label: string
@@ -232,6 +233,8 @@ export function SettingsPage(): JSX.Element {
 
           <div className="flex flex-col gap-5">
             <BackupPanel form={form} set={set} isDirty={isDirty} onRestored={onRestored} />
+
+            <MobileAccessPanel form={form} set={set} isDirty={isDirty} />
 
             <DemoDataPanel onChanged={reloadAfterDataChange} />
 

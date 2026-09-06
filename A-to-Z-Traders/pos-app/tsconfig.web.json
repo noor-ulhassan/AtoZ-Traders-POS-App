@@ -4,6 +4,7 @@
     "src/renderer/src/env.d.ts",
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.tsx",
+    "src/renderer/mobile/**/*",
     "src/shared/**/*",
     "src/preload/*.d.ts"
   ],
@@ -14,6 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@renderer/*": ["src/renderer/src/*"],
+      "@mobile/*": ["src/renderer/mobile/*"],
       "@shared/*": ["src/shared/*"]
     }
   }

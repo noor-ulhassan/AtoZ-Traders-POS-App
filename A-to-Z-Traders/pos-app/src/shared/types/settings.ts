@@ -21,6 +21,17 @@ export interface Settings {
   autoBackupDir: string
   /** Minutes between automatic backups. 0 = only when the app closes. */
   backupIntervalMinutes: number
+
+  /**
+   * Whether a phone on the shop Wi-Fi may connect to this machine.
+   *
+   * Off unless the owner turns it on. Switching it on opens a port on the
+   * shop network; that is a deliberate decision, not something an upgrade
+   * makes for him.
+   */
+  mobileEnabled: boolean
+  /** The port the companion app is served on. Changeable in case of a clash. */
+  mobilePort: number
 }
 
 export type SettingsUpdate = Partial<Settings>

@@ -21,6 +21,14 @@ export const settingsUpdateSchema = z
       .number()
       .int()
       .min(0, 'Choose how often to back up.')
-      .max(1440, 'Back up at least once a day.')
+      .max(1440, 'Back up at least once a day.'),
+    mobileEnabled: z.boolean(),
+    // Below 1024 needs administrator rights on most systems and collides with
+    // the well-known services; above 65535 is not a port at all.
+    mobilePort: z
+      .number()
+      .int()
+      .min(1024, 'Choose a port between 1024 and 65535.')
+      .max(65535, 'Choose a port between 1024 and 65535.')
   })
   .partial()

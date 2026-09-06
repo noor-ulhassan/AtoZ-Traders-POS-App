@@ -16,6 +16,8 @@ interface SettingsRow {
   currency: string
   auto_backup_dir: string
   backup_interval_minutes: number
+  mobile_enabled: number
+  mobile_port: number
 }
 
 /** Maps `Settings` keys to their column names — the only place the two meet. */
@@ -32,7 +34,9 @@ const COLUMNS: Record<keyof Settings, keyof SettingsRow> = {
   logoPath: 'logo_path',
   currency: 'currency',
   autoBackupDir: 'auto_backup_dir',
-  backupIntervalMinutes: 'backup_interval_minutes'
+  backupIntervalMinutes: 'backup_interval_minutes',
+  mobileEnabled: 'mobile_enabled',
+  mobilePort: 'mobile_port'
 }
 
 function toSettings(row: SettingsRow): Settings {
@@ -49,7 +53,9 @@ function toSettings(row: SettingsRow): Settings {
     logoPath: row.logo_path,
     currency: row.currency,
     autoBackupDir: row.auto_backup_dir,
-    backupIntervalMinutes: row.backup_interval_minutes
+    backupIntervalMinutes: row.backup_interval_minutes,
+    mobileEnabled: toBool(row.mobile_enabled),
+    mobilePort: row.mobile_port
   }
 }
 

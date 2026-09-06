@@ -17,6 +17,7 @@ npm run build
 node test/e2e/journey.mjs      # a shop from first launch to backup, and a restart
 node test/e2e/loaded.mjs       # every screen again, with a full shop behind it
 node test/e2e/resilience.mjs   # a power cut mid-sale, a second copy, awkward data
+node test/e2e/phone.mjs        # phone access: the port, the served app, a bill over the wire
 npm run build:win              # only needed for the next one
 node test/e2e/packaged.mjs     # the installed WholesalePOS.exe
 ```

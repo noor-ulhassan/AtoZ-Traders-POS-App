@@ -186,6 +186,11 @@ const api = {
     clear: () => invoke(IPC_CHANNELS.demoClear)
   },
 
+  mobile: {
+    status: () => invoke(IPC_CHANNELS.mobileStatus),
+    signOut: (id) => invoke(IPC_CHANNELS.mobileSignOut, { id })
+  },
+
   printing: {
     receipt: (id) => invoke(IPC_CHANNELS.printReceipt, { id })
   },
