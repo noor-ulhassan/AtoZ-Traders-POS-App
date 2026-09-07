@@ -165,6 +165,81 @@ describe('units and pricing', () => {
   })
 })
 
+/**
+ * The rate box is a free-decimal field, so a biller can type 1000.005 — and a
+ * bill is a document a customer checks with a calculator. Every figure on it
+ * has to be the figure the arithmetic was done with.
+ */
+describe('a bill that has to add up on paper', () => {
+  it('prices the line from the rate it prints, not the rate as typed', () => {
+    const { sale, receipt } = salesService.createSale({
+      items: [{ productId: product.id, unitName: 'piece', qty: 3, rate: 1000.005 }],
+      paymentType: 'cash',
+      paidAmount: 3000.03
+    })
+
+    const line = sale.items[0]!
+    expect(line.rate).toBe(1000.01)
+    expect(line.amount).toBe(3000.03)
+    expect(line.amount).toBe(Number((line.qty * line.rate).toFixed(2)))
+
+    // And the same on the paper the customer is handed.
+    const printed = receipt.lines[0]!
+    expect(printed.amount).toBe(Number((printed.qty * printed.rate - printed.discount).toFixed(2)))
+    expect(receipt.totals.total).toBe(3000.03)
+  })
+
+  it('reconciles with a line discount too', () => {
+    const { receipt } = salesService.createSale({
+      items: [
+        { productId: product.id, unitName: 'piece', qty: 7, rate: 12.345, lineDiscount: 1.5 }
+      ],
+      paymentType: 'cash',
+      paidAmount: 84.95
+    })
+
+    const printed = receipt.lines[0]!
+    expect(printed.rate).toBe(12.35)
+    expect(printed.amount).toBe(Number((printed.qty * printed.rate - printed.discount).toFixed(2)))
+  })
+
+  it('reconciles a credit note the same way', () => {
+    const { sale } = salesService.createSale({
+      customerId: customer.id,
+      items: [{ productId: product.id, unitName: 'piece', qty: 5, rate: 1000.005 }],
+      paymentType: 'credit',
+      paidAmount: 0
+    })
+
+    const credit = returnService.createSaleReturn({
+      saleId: sale.id,
+      items: [{ productId: product.id, unitName: 'piece', qty: 3, rate: 1000.005 }],
+      refundType: 'credit'
+    })
+
+    const line = credit.items[0]!
+    expect(line.rate).toBe(1000.01)
+    expect(line.amount).toBe(Number((line.qty * line.rate).toFixed(2)))
+    expect(credit.total).toBe(line.amount)
+  })
+
+  it('keeps the bill total the sum of the lines it shows', () => {
+    const { sale } = salesService.createSale({
+      items: [
+        { productId: product.id, unitName: 'piece', qty: 3, rate: 1000.005 },
+        { productId: product.id, unitName: 'piece', qty: 1, rate: 0.335 },
+        { productId: product.id, unitName: 'piece', qty: 2, rate: 99.999 }
+      ],
+      paymentType: 'cash',
+      paidAmount: 3200.37
+    })
+
+    const summed = Number(sale.items.reduce((total, item) => total + item.amount, 0).toFixed(2))
+    expect(sale.subtotal).toBe(summed)
+    expect(sale.total).toBe(summed)
+  })
+})
+
 describe('sale guards', () => {
   it('refuses to sell more than is in stock', () => {
     expect(() =>

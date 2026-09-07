@@ -3,6 +3,7 @@ import { registerAuthHandlers } from './channels/auth.ipc'
 import { registerUserHandlers } from './channels/users.ipc'
 import { registerCatalogHandlers } from './channels/catalog.ipc'
 import { registerInsightsHandlers } from './channels/insights.ipc'
+import { registerMobileHandlers } from './channels/mobile.ipc'
 import { registerMoneyHandlers } from './channels/money.ipc'
 import { registerPartyHandlers } from './channels/parties.ipc'
 import { registerSettingsHandlers } from './channels/settings.ipc'
@@ -24,6 +25,7 @@ export function registerIpcHandlers(): void {
   registerMoneyHandlers()
   registerInsightsHandlers()
   registerSystemHandlers()
+  registerMobileHandlers()
 
   assertAllChannelsRegistered()
 }

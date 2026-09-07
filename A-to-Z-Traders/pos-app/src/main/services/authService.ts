@@ -239,3 +239,26 @@ export function staffLogin(input: StaffLoginInput): AuthStatus {
 function authFail(message: string, fields?: Record<string, string>): never {
   throw authError(message, fields)
 }
+
+/**
+ * Checks the admin password and reports whether it matched, with no side
+ * effects at all: no lockout counter, no session, nothing written.
+ *
+ * This exists for the companion app on the phone, and the absence of the
+ * lockout is the point. `login()` above locks the admin credential for fifteen
+ * minutes after five wrong tries, which is right for the one keyboard in front
+ * of the till — but wrong for a port on the shop Wi-Fi, where anyone within
+ * range could lock the owner out of his own till by guessing badly at it. The
+ * network path is throttled per device instead (`mobile/rateLimit.ts`), so a
+ * guesser is slowed down without the counter being usable as a weapon.
+ */
+export function verifyAdminPassword(password: string): boolean {
+  const row = repo.getCredential(getDb())
+  if (!row) return false
+  return verifySecret(password, row.password_salt, row.password_hash)
+}
+
+/** Whether an admin password has been set up on this device at all. */
+export function isAdminConfigured(): boolean {
+  return repo.isConfigured(getDb())
+}

@@ -26,6 +26,7 @@ import type {
   IpcResult,
   LedgerStatement,
   LowStockRow,
+  MobileStatus,
   OtherStockFilters,
   OtherStockMovementInput,
   OtherStockReport,
@@ -207,6 +208,9 @@ export const IPC_CHANNELS = {
   demoClear: 'demo:clear',
   backupStatus: 'backup:status',
   backupList: 'backup:list',
+
+  mobileStatus: 'mobile:status',
+  mobileSignOut: 'mobile:signOut',
 
   printReceipt: 'printing:receipt',
 
@@ -404,6 +408,20 @@ export interface PosApi {
     status(): Result<DemoStatus>
     seed(): Result<DemoSeedResult>
     clear(): Result<DemoClearResult>
+  }
+
+  /**
+   * Phone access over the shop's own Wi-Fi.
+   *
+   * Switching it on and choosing the port are ordinary settings fields
+   * (`mobileEnabled`, `mobilePort`) — there is one saved copy of that state and
+   * the server follows it. These two channels are the parts that are not
+   * settings: what is happening right now, and turning a device away.
+   */
+  mobile: {
+    status(): Result<MobileStatus>
+    /** Signs out one phone, or every phone when no id is given. */
+    signOut(id?: string): Result<MobileStatus>
   }
 
   printing: {

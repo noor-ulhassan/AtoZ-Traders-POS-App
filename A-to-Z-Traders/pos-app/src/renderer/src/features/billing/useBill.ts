@@ -99,11 +99,11 @@ export function useBill({ taxEnabled, taxRate, stockAllowance }: UseBillOptions)
   const nextKey = useRef(1)
 
   const totals = useMemo<BillTotals>(() => {
-    // Mirror salesService exactly: the gross is rounded before the (rounded)
-    // line discount is taken off it, so the screen can never show a subtotal the
-    // save then disagrees with by a paisa.
+    // Mirror salesService exactly: the rate is rounded first, then the gross,
+    // then the (rounded) line discount comes off it — so the screen can never
+    // show a subtotal the save then disagrees with by a paisa.
     const subtotal = sumMoney(
-      lines.map((line) => money(money(line.qty * line.rate) - money(line.lineDiscount)))
+      lines.map((line) => money(money(line.qty * money(line.rate)) - money(line.lineDiscount)))
     )
     const cappedDiscount = Math.min(discount, subtotal)
     const taxable = money(subtotal - cappedDiscount)

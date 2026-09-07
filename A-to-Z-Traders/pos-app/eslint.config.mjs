@@ -38,8 +38,13 @@ export default defineConfig(
     }
   },
   {
-    // Build tooling, not application code: plain Node scripts.
-    files: ['scripts/**/*.mjs', '*.config.{ts,mjs}'],
+    // Build tooling and the end-to-end runs, not application code: plain Node
+    // scripts, and the e2e ones also evaluate helper functions inside the
+    // renderer, where `window`/`document` are the globals that matter.
+    files: ['scripts/**/*.mjs', 'test/e2e/**/*.mjs', '*.config.{ts,mjs}'],
+    languageOptions: {
+      globals: { window: 'readonly', document: 'readonly', HTMLInputElement: 'readonly' }
+    },
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off'
     }

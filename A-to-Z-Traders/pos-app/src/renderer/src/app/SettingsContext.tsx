@@ -23,7 +23,9 @@ const FALLBACK: Settings = {
   logoPath: '',
   currency: 'PKR',
   autoBackupDir: '',
-  backupIntervalMinutes: 15
+  backupIntervalMinutes: 15,
+  mobileEnabled: false,
+  mobilePort: 8420
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)

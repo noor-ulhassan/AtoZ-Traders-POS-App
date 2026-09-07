@@ -1,0 +1,19 @@
+{
+  "name": "Wholesale POS",
+  "short_name": "POS",
+  "description": "The shop's till, on your phone. Works on the shop Wi-Fi.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f4f2",
+  "theme_color": "#14648a",
+  "icons": [
+    {
+      "src": "/pos-icon.png",
+      "sizes": "192x192 256x256 512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

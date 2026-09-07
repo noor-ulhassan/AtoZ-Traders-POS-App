@@ -90,6 +90,9 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
     const unit = resolveUnit(db, product, item.unitName)
     const lineQty = qty(item.qty)
     const baseQty = qty(lineQty * unit.factor)
+    // Rounded once and used for both the stored rate and the amount, so a
+    // credit note adds up on paper. Same rule as a bill line (salesService).
+    const rate = money(item.rate)
 
     // Consignment goods never had a cost to the shop, so there is no profit to
     // reverse — the same zero the sale line carried.
@@ -106,10 +109,10 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
       factor: unit.factor,
       qty: lineQty,
       baseQty,
-      rate: money(item.rate),
+      rate,
       costPrice,
       isOther,
-      amount: money(lineQty * item.rate)
+      amount: money(lineQty * rate)
     }
   })
 

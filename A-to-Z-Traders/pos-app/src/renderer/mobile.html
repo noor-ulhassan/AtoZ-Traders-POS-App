@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      `viewport-fit=cover` lets the app paint under the notch and the home
+      indicator; the safe-area insets in styles.css keep the bars clear of
+      both. `maximum-scale` is deliberately NOT set — pinching to zoom is an
+      accessibility feature, and the 16px base font already stops iOS zooming
+      on its own when a field is focused.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Wholesale POS</title>
+
+    <meta name="theme-color" content="#14648a" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101317" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="POS" />
+    <!-- A shop's records have no business in a search index. -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/pos-icon.png" />
+    <link rel="apple-touch-icon" href="/pos-icon.png" />
+
+    <!--
+      The Content-Security-Policy is sent as a response header by the server
+      (`mobile/staticFiles.ts`) rather than declared here, so that the Vite dev
+      server's injected client and its websocket still work while developing.
+      The shipped app is locked to 'self' exactly as the desktop window is.
+    -->
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/mobile/main.tsx"></script>
+  </body>
+</html>

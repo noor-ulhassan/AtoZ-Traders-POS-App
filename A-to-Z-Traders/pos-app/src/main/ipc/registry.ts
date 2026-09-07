@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { IpcChannel } from '@shared/ipc'
 import { IPC_CHANNELS } from '@shared/ipc'
-import type { IpcResult } from '@shared/types'
+import type { IpcResult, UserRole } from '@shared/types'
 import { currentRole, isUnlocked } from '../auth/session'
 import { isBusy } from './maintenance'
 import { AppError, translateSqliteError } from '../utils/errors'
@@ -10,7 +10,23 @@ import { logger } from '../utils/logger'
 
 const log = logger.child('ipc')
 
-const registered = new Set<string>()
+/**
+ * Every registered channel, keyed by name.
+ *
+ * This is a map rather than the set of names it used to be because the desktop
+ * window is no longer the only caller. The companion app on the phone reaches
+ * the same channels over HTTP, and it must reach them through the same guard,
+ * the same schema and the same service — so the pipeline lives in
+ * `invokeChannel` below and both callers go through it. Two copies of it would
+ * drift, and the copy that drifted would be the one that let something through.
+ */
+interface RegisteredHandler {
+  schema: z.ZodTypeAny
+  service: (input: never) => unknown
+  options: HandlerOptions
+}
+
+const handlers = new Map<IpcChannel, RegisteredHandler>()
 
 /**
  * What a shopkeeper may do — the authoritative access policy, enforced in the
@@ -87,13 +103,28 @@ const FORBIDDEN_RESULT: IpcResult<never> = {
   error: { code: 'AUTH', message: 'Your account does not have access to that.' }
 }
 
-/** Decides whether the signed-in role may run `channel` with this payload.
- *  Exported for direct testing of the access policy. */
-export function isAuthorized(channel: IpcChannel, input: unknown): boolean {
-  if (currentRole() === 'admin') return true
+/**
+ * Decides whether `role` may run `channel` with this payload.
+ *
+ * Pure — it reads no session — so a caller that carries its own identity (a
+ * request from the phone) is judged by exactly the policy the desktop window
+ * is judged by, out of the same table.
+ */
+export function isRoleAuthorized(
+  role: UserRole | null,
+  channel: IpcChannel,
+  input: unknown
+): boolean {
+  if (role === 'admin') return true
   const rule = SHOPKEEPER_CHANNELS[channel]
   if (rule === true) return true
   return typeof rule === 'function' && rule(input)
+}
+
+/** As `isRoleAuthorized`, for whoever is signed in right now.
+ *  Exported for direct testing of the access policy. */
+export function isAuthorized(channel: IpcChannel, input: unknown): boolean {
+  return isRoleAuthorized(currentRole(), channel, input)
 }
 
 function validationError(error: z.ZodError): AppError {
@@ -150,6 +181,17 @@ const BUSY_RESULT: IpcResult<never> = {
   }
 }
 
+/**
+ * Returned for a channel name with no handler. Unreachable from the preload,
+ * which can only name channels the shared contract declares, but the companion
+ * server takes a channel name off the wire and must have an answer for one
+ * that does not exist.
+ */
+const UNKNOWN_RESULT: IpcResult<never> = {
+  ok: false,
+  error: { code: 'NOT_FOUND', message: 'That action does not exist.' }
+}
+
 export interface HandlerOptions {
   /**
    * When true the channel runs even while the app is locked. Reserved for the
@@ -160,12 +202,70 @@ export interface HandlerOptions {
 }
 
 /**
- * Registers a thin IPC handler: enforce the lock, validate input, call the
- * service, wrap the result. Handlers hold no business logic.
+ * Runs one channel end to end: enforce the lock, validate the input, check the
+ * role, call the service, wrap the result. Never throws — every failure comes
+ * back as `{ ok: false, error }`.
  *
- * The lock is enforced here, in the main process, rather than by hiding
- * screens in the renderer — a channel invoked from a compromised or scripted
- * renderer still gets nothing back until the session is unlocked.
+ * The lock and the role are enforced here, in the main process, rather than by
+ * hiding screens in the renderer: a channel invoked from a scripted renderer,
+ * or from a phone on the shop Wi-Fi, still gets nothing back until the session
+ * is unlocked and the role permits it.
+ *
+ * The caller's identity is ambient — the desktop window's own session, or the
+ * one a phone request installs around this call with `runAs`. Both arrive at
+ * `currentRole()`, so neither this function nor any service below it needs to
+ * know which kind of caller it is serving.
+ */
+export async function invokeChannel(
+  channel: IpcChannel,
+  payload: unknown
+): Promise<IpcResult<unknown>> {
+  const handler = handlers.get(channel)
+  if (!handler) {
+    log.warn(`${channel} has no handler`)
+    return UNKNOWN_RESULT
+  }
+
+  const { schema, service, options } = handler
+
+  if (!options.public && !isUnlocked()) {
+    log.warn(`${channel} blocked: app is locked`)
+    return LOCKED_RESULT
+  }
+
+  // Hold business channels off the database while a restore swaps the file.
+  if (!options.public && isBusy()) {
+    log.warn(`${channel} blocked: maintenance in progress`)
+    return BUSY_RESULT
+  }
+
+  const parsed = schema.safeParse(payload)
+  if (!parsed.success) {
+    const error = validationError(parsed.error)
+    log.warn(`${channel} invalid input`, error.fields)
+    return { ok: false, error: error.toIpcError() }
+  }
+
+  // Role check runs on the validated payload so a payload rule (e.g. "customer
+  // receipts only") sees clean data. Public channels are exempt — they are how
+  // a session is established in the first place.
+  if (!options.public && !isAuthorized(channel, parsed.data)) {
+    log.warn(`${channel} blocked: role ${currentRole()} not permitted`)
+    return FORBIDDEN_RESULT
+  }
+
+  try {
+    const data = await service(parsed.data as never)
+    return { ok: true, data }
+  } catch (error) {
+    return toResult(error, channel)
+  }
+}
+
+/**
+ * Registers a thin IPC handler: a channel, the schema its payload must satisfy
+ * and the service behind it. Handlers hold no business logic — the pipeline
+ * around them is `invokeChannel`.
  */
 export function registerHandler<Schema extends z.ZodTypeAny, Output>(
   channel: IpcChannel,
@@ -173,45 +273,21 @@ export function registerHandler<Schema extends z.ZodTypeAny, Output>(
   service: (input: z.infer<Schema>) => Output | Promise<Output>,
   options: HandlerOptions = {}
 ): void {
-  if (registered.has(channel)) {
+  if (handlers.has(channel)) {
     throw new Error(`IPC channel "${channel}" is registered twice.`)
   }
-  registered.add(channel)
+  handlers.set(channel, { schema, service: service as (input: never) => unknown, options })
 
-  ipcMain.handle(channel, async (_event, payload: unknown): Promise<IpcResult<Output>> => {
-    if (!options.public && !isUnlocked()) {
-      log.warn(`${channel} blocked: app is locked`)
-      return LOCKED_RESULT
-    }
+  ipcMain.handle(
+    channel,
+    (_event, payload: unknown): Promise<IpcResult<Output>> =>
+      invokeChannel(channel, payload) as Promise<IpcResult<Output>>
+  )
+}
 
-    // Hold business channels off the database while a restore swaps the file.
-    if (!options.public && isBusy()) {
-      log.warn(`${channel} blocked: maintenance in progress`)
-      return BUSY_RESULT
-    }
-
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) {
-      const error = validationError(parsed.error)
-      log.warn(`${channel} invalid input`, error.fields)
-      return { ok: false, error: error.toIpcError() }
-    }
-
-    // Role check runs on the validated payload so a payload rule (e.g. "customer
-    // receipts only") sees clean data. Public channels are exempt — they are how
-    // a session is established in the first place.
-    if (!options.public && !isAuthorized(channel, parsed.data)) {
-      log.warn(`${channel} blocked: role ${currentRole()} not permitted`)
-      return FORBIDDEN_RESULT
-    }
-
-    try {
-      const data = await service(parsed.data)
-      return { ok: true, data }
-    } catch (error) {
-      return toResult(error, channel)
-    }
-  })
+/** True when `channel` names a registered handler. Narrows an off-the-wire string. */
+export function isChannelRegistered(channel: string): channel is IpcChannel {
+  return handlers.has(channel as IpcChannel)
 }
 
 /** No-payload channels. Tolerates the `undefined` the preload sends. */
@@ -225,9 +301,9 @@ export const noInput = z
  * every channel in the shared contract must have a handler.
  */
 export function assertAllChannelsRegistered(): void {
-  const missing = Object.values(IPC_CHANNELS).filter((channel) => !registered.has(channel))
+  const missing = Object.values(IPC_CHANNELS).filter((channel) => !handlers.has(channel))
   if (missing.length > 0) {
     throw new Error(`No IPC handler registered for: ${missing.join(', ')}`)
   }
-  log.info(`${registered.size} IPC channels registered`)
+  log.info(`${handlers.size} IPC channels registered`)
 }
