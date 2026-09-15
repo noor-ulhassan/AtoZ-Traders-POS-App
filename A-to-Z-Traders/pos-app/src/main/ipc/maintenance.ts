@@ -10,6 +10,8 @@
  * that is about to be replaced.
  */
 
+import { businessRule } from '../utils/errors'
+
 let busy = false
 
 export function isBusy(): boolean {
@@ -18,6 +20,7 @@ export function isBusy(): boolean {
 
 /** Runs `work` with maintenance mode on, clearing it even if `work` throws. */
 export async function underMaintenance<T>(work: () => Promise<T>): Promise<T> {
+  if (busy) throw businessRule('A restore is already in progress. Wait for it to finish.')
   busy = true
   try {
     return await work()

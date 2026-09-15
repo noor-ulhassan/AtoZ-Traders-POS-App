@@ -121,11 +121,7 @@ interface PricedBill {
  * correcting a typo cannot restate what an old month earned. Only genuinely
  * new lines take today's cost.
  */
-function priceBill(
-  db: Db,
-  input: SaleInput,
-  frozenCosts: Map<Id, number> = new Map()
-): PricedBill {
+function priceBill(db: Db, input: SaleInput, frozenCosts: Map<Id, number> = new Map()): PricedBill {
   if (input.items.length === 0) {
     throw businessRule('Add at least one item to the bill.')
   }
@@ -146,6 +142,11 @@ function priceBill(
     const unit = resolveUnit(db, product, item.unitName)
     const lineQty = qty(item.qty)
     const baseQty = qty(lineQty * unit.factor)
+    if (lineQty <= 0 || baseQty <= 0) {
+      throw businessRule(
+        `Quantity for "${product.name}" is too small. It must be more than zero after rounding.`
+      )
+    }
     const lineDiscount = money(item.lineDiscount ?? 0)
     // The rate is rounded ONCE, here, and everything below is priced from the
     // rounded figure — because that is the figure that gets stored and
@@ -346,7 +347,6 @@ function resolvePaymentType(total: number, paidAmount: number): SaleInput['payme
 export function getReceipt(saleId: Id): Receipt {
   return buildReceipt(getSale(saleId))
 }
-
 
 // ===========================================================================
 // Phase 4 - changing a bill after it has been issued

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { closeDatabase, databasePath, openDatabase, setDb } from '../src/main/db/connection'
 import { migrate } from '../src/main/db/migrate'
 import { createTestDb } from './helpers/database'
@@ -55,6 +55,23 @@ afterEach(() => {
 })
 
 describe('taking a backup while the app is running', () => {
+  it('preserves separate backups requested together in the same second', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-15T12:00:00'))
+    try {
+      const copies = await Promise.all([
+        backupService.onlineBackupTo(folder),
+        backupService.onlineBackupTo(folder)
+      ])
+      expect(new Set(copies.map((copy) => copy.path)).size).toBe(2)
+      expect(backupService.listBackups(folder)).toHaveLength(2)
+      for (const copy of copies)
+        expect(() => backupService.assertUsableBackup(copy.path)).not.toThrow()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('writes a file that opens as a working database', async () => {
     const result = await backupService.onlineBackupTo(folder)
 

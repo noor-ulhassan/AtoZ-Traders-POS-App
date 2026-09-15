@@ -222,7 +222,7 @@ export function insertSaleReturnItem(
   )
 }
 
-/** The cost frozen onto the original sale line, so profit reverses exactly. */
+/** Frozen cost is per base unit, including returns made in a different unit. */
 export function findOriginalSaleCost(
   db: Db,
   saleId: Id,
@@ -232,8 +232,8 @@ export function findOriginalSaleCost(
   const row = db
     .prepare<[Id, Id, string], { cost_price: number }>(
       `SELECT cost_price FROM sale_items
-        WHERE sale_id = ? AND product_id = ? AND unit_name = ?
-        ORDER BY id LIMIT 1`
+        WHERE sale_id = ? AND product_id = ?
+        ORDER BY (unit_name = ?) DESC, id LIMIT 1`
     )
     .get(saleId, productId, unitName)
   return row?.cost_price ?? null

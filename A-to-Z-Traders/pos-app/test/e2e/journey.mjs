@@ -653,7 +653,7 @@ await check('tax turns on and every figure moves with it', async () => {
   return 'tax applied, receipt agrees'
 })
 
-await check('a double-click on Save writes one bill, not two', async () => {
+await check('independent simultaneous sales receive distinct invoice numbers', async () => {
   const before = await api('sales.list', { limit: 1000 })
   const fired = await session.evaluate(async (productId) => {
     const payload = {
@@ -661,7 +661,7 @@ await check('a double-click on Save writes one bill, not two', async () => {
       paymentType: 'cash',
       paidAmount: 1450
     }
-    // Both requests leave before either answer arrives - a real double-click.
+    // Two independent API requests are two sales; UI repeat protection is checked below.
     const [a, b] = await Promise.all([
       window.api.sales.create(payload),
       window.api.sales.create(payload)
@@ -669,9 +669,43 @@ await check('a double-click on Save writes one bill, not two', async () => {
     return [a.ok, b.ok]
   }, ids.oil.id)
   const after = await api('sales.list', { limit: 1000 })
+  eq(fired.filter(Boolean).length, 2, 'accepted independent sales')
+  eq(after.total - before.total, 2, 'saved independent sales')
   const invoices = after.rows.map((r) => r.invoiceNo)
   eq(new Set(invoices).size, invoices.length, 'two bills share an invoice number')
   return `${after.total - before.total} bill(s) from ${fired.filter(Boolean).length} accepted requests`
+})
+
+await check('rapid clicks on the billing Save button write exactly one bill', async () => {
+  const before = await api('sales.list')
+  const stockBefore = await api('products.get', ids.oil.id)
+  await goto('#/billing')
+  await ui(() => window.__t.fillSelector('input[placeholder*="Scan a barcode" i]', 'Cooking'))
+  await sleep(900)
+  await ui(() => {
+    const option = Array.from(document.querySelectorAll('[role=option], li, button')).find(
+      (el) => (el.textContent || '').includes('Cooking oil 5L') && el.offsetParent !== null
+    )
+    if (!option) throw new Error('the product search showed no match')
+    option.click()
+  })
+  await sleep(700)
+  await ui(() => {
+    const save = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent.includes('Save bill') && el.offsetParent !== null
+    )
+    if (!save || save.disabled) throw new Error('the Save bill button is not ready')
+    save.click()
+    save.click()
+    save.click()
+  })
+  assert(await ui(async () => await window.__t.waitFor('Invoice', 10000)), 'no saved receipt')
+  const after = await api('sales.list')
+  eq(after.total - before.total, 1, 'bills saved by rapid button clicks')
+  const stockAfter = await api('products.get', ids.oil.id)
+  eq(stockAfter.stockQty, stockBefore.stockQty - 1, 'stock deducted exactly once')
+  await goto('#/sales')
+  return 'three rapid clicks, one bill and one stock deduction'
 })
 
 await check('the sample data can be seeded and removed without touching real records', async () => {

@@ -1,5 +1,6 @@
 import { app, dialog } from 'electron'
 import Database from 'better-sqlite3'
+import { randomUUID } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -21,10 +22,11 @@ import type {
 } from '@shared/types'
 import { checkpoint, closeDatabase, databasePath, openDatabase, setDb } from '../db/connection'
 import { currentVersion, migrate } from '../db/migrate'
+import { LATEST_VERSION } from '../db/migrations'
 import { getSettings } from '../repositories/settingsRepository'
 import { getDb } from '../db/connection'
 import { AppError, businessRule } from '../utils/errors'
-import { underMaintenance } from '../ipc/maintenance'
+import { isBusy, underMaintenance } from '../ipc/maintenance'
 import { logger } from '../utils/logger'
 import { planRetention } from './backupRetention'
 
@@ -33,9 +35,27 @@ const log = logger.child('backup')
 /** `pos-backup-20260828-141503.db`. Parsed back out, so it must never vary. */
 const FILE_PREFIX = 'pos-backup-'
 const FILE_SUFFIX = '.db'
-const NAME_PATTERN = /^pos-backup-(\d{8})-(\d{6})\.db$/
+const NAME_PATTERN = /^pos-backup-(\d{8})-(\d{6})(?:-\d+)?\.db$/
 /** A backup still being written. Renamed into place only once it is complete. */
 const PART_SUFFIX = '.part'
+const pendingBackupPaths = new Set<string>()
+
+/** Reserve before the first await; manual and scheduled copies may overlap. */
+function reserveBackupPath(folder: string): string {
+  const name = backupFileName().slice(0, -FILE_SUFFIX.length)
+  let sequence = 0
+  let target: string
+  do {
+    target = join(folder, `${name}${sequence === 0 ? '' : `-${sequence}`}${FILE_SUFFIX}`)
+    sequence += 1
+  } while (
+    pendingBackupPaths.has(target) ||
+    existsSync(target) ||
+    existsSync(`${target}${PART_SUFFIX}`)
+  )
+  pendingBackupPaths.add(target)
+  return target
+}
 
 function stamp(now: Date = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, '0')
@@ -175,8 +195,19 @@ export function copyDatabaseTo(targetDir: string): BackupResult {
   const folder = ensureFolder(targetDir)
   checkpoint()
 
-  const target = join(folder, backupFileName())
-  copyFileSync(databasePath(), target)
+  const target = reserveBackupPath(folder)
+  const partial = `${target}${PART_SUFFIX}`
+  try {
+    copyFileSync(databasePath(), partial)
+    renameSync(partial, target)
+  } finally {
+    pendingBackupPaths.delete(target)
+    try {
+      rmSync(partial, { force: true })
+    } catch {
+      /* left as an unlisted partial */
+    }
+  }
   log.info(`backup copied to ${target}`)
   return describe(target)
 }
@@ -191,8 +222,10 @@ export function copyDatabaseTo(targetDir: string): BackupResult {
  * that looks like a usable backup but is half a database.
  */
 export async function onlineBackupTo(targetDir: string): Promise<BackupResult> {
+  if (isBusy())
+    throw businessRule('A restore is in progress. Try the backup again when it finishes.')
   const folder = ensureFolder(targetDir)
-  const target = join(folder, backupFileName())
+  const target = reserveBackupPath(folder)
   const partial = `${target}${PART_SUFFIX}`
 
   try {
@@ -206,6 +239,8 @@ export async function onlineBackupTo(targetDir: string): Promise<BackupResult> {
       // match the backup name pattern, so nothing will ever offer to restore it.
     }
     throw error
+  } finally {
+    pendingBackupPaths.delete(target)
   }
 
   log.info(`backup written to ${target}`)
@@ -428,6 +463,15 @@ export function assertUsableBackup(path: string): void {
     if (!row || row.n < 3) {
       throw businessRule('That file does not look like a POS backup.')
     }
+    if (currentVersion(probe) > LATEST_VERSION) {
+      throw businessRule(
+        'That backup was made by a newer version of the app. Update the app before restoring it.'
+      )
+    }
+    const foreignKeyErrors = probe.pragma('foreign_key_check') as unknown[]
+    if (probe.pragma('quick_check', { simple: true }) !== 'ok' || foreignKeyErrors.length !== 0) {
+      throw businessRule('That backup has damaged or inconsistent data. Choose a different backup.')
+    }
   } catch (error) {
     if (error instanceof AppError) throw error
     throw businessRule('That file could not be opened as a database. Choose a different backup.')
@@ -488,29 +532,73 @@ async function performRestore(source: string): Promise<RestoreResult> {
   if (response !== 0) throw new AppError('CANCELLED', 'Restore cancelled.')
 
   const live = databasePath()
-  const safetyCopy = join(app.getPath('userData'), `pos-before-restore-${stamp()}.db`)
+  const restoreId = randomUUID()
+  const safetyCopy = join(app.getPath('userData'), `pos-before-restore-${stamp()}-${restoreId}.db`)
+  const staged = join(app.getPath('userData'), `pos-restore-${restoreId}.db`)
 
   // Turn business IPC away while the connection is closed and the file swapped,
   // so a sale firing from the renderer mid-restore cannot touch a database that
   // is about to be replaced.
   return underMaintenance(async () => {
-    checkpoint()
-    closeDatabase()
-
+    if (pendingBackupPaths.size > 0) {
+      throw businessRule('A backup is in progress. Try restoring again when it finishes.')
+    }
+    let movedLive = false
+    let installed = false
     try {
+      // Prepare and migrate a separate snapshot first. A failed migration,
+      // unreadable source, or full disk must leave the current connection usable.
+      // SQLite's backup API also includes any committed WAL pages in the source.
+      const sourceDb = new Database(source, { readonly: true, fileMustExist: true })
+      try {
+        await sourceDb.backup(staged)
+      } finally {
+        sourceDb.close()
+      }
+      assertUsableBackup(staged)
+      const candidate = openDatabase(staged)
+      try {
+        migrate(candidate)
+        candidate.pragma('wal_checkpoint(TRUNCATE)')
+      } finally {
+        candidate.close()
+      }
+      assertUsableBackup(staged)
+
+      checkpoint()
+      closeDatabase()
       renameSync(live, safetyCopy)
-      copyFileSync(source, live)
-    } catch (error) {
-      // Put things back exactly as they were before re-opening.
-      if (!existsSync(live) && existsSync(safetyCopy)) renameSync(safetyCopy, live)
+      movedLive = true
+      renameSync(staged, live)
+      installed = true
       setDb(openDatabase())
+    } catch (error) {
+      // The old file stays recoverable even if opening the replacement fails.
+      if (movedLive) {
+        closeDatabase()
+        if (installed) renameSync(live, staged)
+        renameSync(safetyCopy, live)
+        setDb(openDatabase())
+      } else {
+        // A failure between closeDatabase and the first rename also needs a
+        // connection again; preparation failures leave the original one open.
+        try {
+          getDb()
+        } catch {
+          setDb(openDatabase())
+        }
+      }
       log.error('restore failed', error)
       throw businessRule('The backup could not be restored. Your existing data is unchanged.')
+    } finally {
+      for (const suffix of ['', '-wal', '-shm']) {
+        try {
+          rmSync(`${staged}${suffix}`, { force: true })
+        } catch {
+          log.warn('could not remove temporary restore file')
+        }
+      }
     }
-
-    const db = openDatabase()
-    setDb(db)
-    migrate(db)
 
     // The restored file describes a different shop than the one this session
     // has been counting changes against.

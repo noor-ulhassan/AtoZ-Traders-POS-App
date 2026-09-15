@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { request as httpRequest } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createGzip } from 'node:zlib'
+import { pipeline } from 'node:stream'
 import { join, normalize, sep } from 'node:path'
 
 /**
@@ -64,12 +65,22 @@ export function resolveStaticFile(urlPath: string, root = rendererDir()): string
   if (HIDDEN.has(urlPath)) return null
 
   // `/` is the companion app. The desktop's index.html keeps its own name.
-  const relative = urlPath === '/' ? 'mobile.html' : decodeURIComponent(urlPath).replace(/^\/+/, '')
+  let relative: string
+  try {
+    relative = urlPath === '/' ? 'mobile.html' : decodeURIComponent(urlPath).replace(/^\/+/, '')
+  } catch {
+    return null
+  }
   if (relative.includes('\0')) return null
 
   const candidate = normalize(join(root, relative))
   if (candidate !== root && !candidate.startsWith(root + sep)) return null
-  if (!existsSync(candidate) || !statSync(candidate).isFile()) return null
+  if (candidate.toLowerCase() === join(root, 'index.html').toLowerCase()) return null
+  try {
+    if (!existsSync(candidate) || !statSync(candidate).isFile()) return null
+  } catch {
+    return null
+  }
   return candidate
 }
 
@@ -133,12 +144,16 @@ export function sendFile(
     // No Content-Length: the compressed size is not known until it has been
     // compressed, and the response is streamed rather than buffered.
     response.writeHead(200, { ...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' })
-    createReadStream(filePath).pipe(createGzip()).pipe(response)
+    pipeline(createReadStream(filePath), createGzip(), response, () => {
+      // pipeline closes all streams on a disconnected phone or unreadable file.
+    })
     return
   }
 
   response.writeHead(200, { ...headers, 'Content-Length': statSync(filePath).size })
-  createReadStream(filePath).pipe(response)
+  pipeline(createReadStream(filePath), response, () => {
+    // A file disappearing mid-read must not become an uncaught main-process error.
+  })
 }
 
 /**

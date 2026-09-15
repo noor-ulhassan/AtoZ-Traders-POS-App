@@ -134,6 +134,17 @@ await check('the built script and stylesheet load', async () => {
   return `${assets.length} assets, all 200`
 })
 
+await check('malformed phone paths leave the server and desktop responsive', async () => {
+  for (const path of ['/%', '/%E0%A4%A', '/%00', '/%69ndex.html', '/INDEX.HTML']) {
+    const response = await fetch(`${BASE}${path}`)
+    const html = await response.text()
+    assert(!/src="[^"]*assets\/index-[^"]*\.js"/.test(html), 'desktop shell was exposed')
+  }
+  assert((await fetch(`${BASE}/api/health`)).status === 200, 'health check failed afterwards')
+  assert((await api('mobile.status')).running, 'desktop lost its phone server')
+  return 'five invalid or hidden paths, server still healthy'
+})
+
 await check('the icon, manifest and service worker are all there', async () => {
   for (const path of ['/manifest.webmanifest', '/mobile-sw.js', '/pos-icon.png']) {
     const response = await fetch(`${BASE}${path}`)
@@ -274,6 +285,52 @@ await check('a report downloads without opening a dialog on this machine', async
   const csv = await response.text()
   assert(csv.includes('Phone Test Trader'), 'the customer written above is not in the report')
   return `${csv.split('\n').length} lines`
+})
+
+await check('rapid taps on the companion save button record one bill', async () => {
+  const before = await api('sales.list')
+  const product = (await api('products.list', { search: 'Phone Test Ghee' })).rows[0]
+  const desktopUrl = await ui(() => location.href)
+  try {
+    await s.cdp.send('Page.navigate', { url: `${BASE}/#/bill` })
+    await sleep(1500)
+    await s.cdp.send('Runtime.evaluate', { expression: INSTALL })
+    await ui(() => window.__t.fill('Shop password', 'shopOwner#2026'))
+    await sleep(100)
+    await ui(() => window.__t.click('Sign in'))
+    assert(
+      await ui(async () => await window.__t.waitFor('Add items', 10000)),
+      'no companion bill screen'
+    )
+    await ui(() =>
+      window.__t.fillSelector('input[placeholder*="Search by name"]', 'Phone Test Ghee')
+    )
+    await sleep(900)
+    await ui(() => window.__t.click('Phone Test Ghee 5kg'))
+    await sleep(700)
+    await ui(() => window.__t.clickAny('Save bill'))
+    await sleep(300)
+    await ui(() => {
+      const buttons = Array.from(document.querySelectorAll('button')).filter(
+        (el) => el.offsetParent !== null && !el.disabled
+      )
+      const save = buttons.find((el) => el.textContent.includes('Paid in full'))
+      if (!save) throw new Error('no companion final save button')
+      save.click()
+      save.click()
+      save.click()
+    })
+    await sleep(1000)
+  } finally {
+    await s.cdp.send('Page.navigate', { url: desktopUrl })
+    await sleep(1500)
+    await s.cdp.send('Runtime.evaluate', { expression: INSTALL })
+  }
+  const after = await api('sales.list')
+  assert(after.total === before.total + 1, `rapid taps wrote ${after.total - before.total} bills`)
+  const stock = await api('products.get', product.id)
+  assert(stock.stockQty === product.stockQty - 1, 'stock was not deducted exactly once')
+  return 'three rapid taps, one bill and one stock deduction'
 })
 
 await check('switching it off closes the port and signs the phone out', async () => {

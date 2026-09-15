@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ApiError, errorMessage, fieldErrors } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
 
@@ -31,11 +31,15 @@ export function useMutation<Args extends unknown[], T>(
   options: Options<T> = {}
 ): Mutation<Args, T> {
   const toast = useToast()
+  const inFlight = useRef(false)
   const [isPending, setIsPending] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const run = useCallback(
     async (...args: Args): Promise<T | undefined> => {
+      // React renders the disabled button later; block repeat events immediately.
+      if (inFlight.current) return undefined
+      inFlight.current = true
       setIsPending(true)
       setErrors({})
       try {
@@ -49,6 +53,7 @@ export function useMutation<Args extends unknown[], T>(
         toast.error(options.errorTitle ?? 'Could not save', errorMessage(error))
         return undefined
       } finally {
+        inFlight.current = false
         setIsPending(false)
       }
     },
