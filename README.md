@@ -49,7 +49,7 @@ The `better-sqlite3` native module is compiled against the Electron V8 ABI durin
 - **Storage Location:** `%APPDATA%/Wholesale POS/pos.db`
 - **Migrations:** Managed via append-only SQL scripts in `src/main/db/migrations/`. The migration runner executes unapplied scripts in a transaction upon application startup.
 - **Transactions:** All multi-table writes (e.g., sales processing, inventory updates, ledger modifications) must be wrapped in atomic transactions to guarantee data integrity.
-- **Backups:** The application includes a manual and automated backup utility. Backups checkpoint the WAL prior to copying the database file.
+- **Backups:** Local recovery snapshots are created automatically on startup, every 15 minutes when data changes, and on normal close. An optional additional folder follows its own saved schedule and retries independently. Every new snapshot is checked before it becomes a completed `.db` backup. Settings → Data & backups provides Browse/Open folder controls, separate destination status, readable backup checks, and restore. Manual copies and legacy backups are excluded from automatic retention. Backup verification and failure history are stored alongside the live database in `backup-history.json`; this does not change business records. Local copies are on the same computer, so keep an additional copy on separate storage. Saving into a cloud-sync folder does not confirm upload.
 
 ## Domain Guidelines
 

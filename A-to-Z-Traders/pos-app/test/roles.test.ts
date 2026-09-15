@@ -163,6 +163,9 @@ describe('access policy (fail-closed)', () => {
     expect(isAuthorized(IPC_CHANNELS.backupList, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.backupRunNow, {})).toBe(false)
     expect(isAuthorized(IPC_CHANNELS.backupRestoreFrom, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupChooseFolder, {})).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupOpenFolder, { kind: 'data' })).toBe(false)
+    expect(isAuthorized(IPC_CHANNELS.backupCheck, {})).toBe(false)
   })
 
   it('denies a shopkeeper any channel added since the allowlist was written', () => {

@@ -177,7 +177,10 @@ const api = {
     restoreFrom: (path) => invoke(IPC_CHANNELS.backupRestoreFrom, { path }),
     info: () => invoke(IPC_CHANNELS.backupInfo),
     status: () => invoke(IPC_CHANNELS.backupStatus),
-    list: () => invoke(IPC_CHANNELS.backupList)
+    list: () => invoke(IPC_CHANNELS.backupList),
+    chooseFolder: () => invoke(IPC_CHANNELS.backupChooseFolder),
+    openFolder: (kind) => invoke(IPC_CHANNELS.backupOpenFolder, { kind }),
+    check: (path) => invoke(IPC_CHANNELS.backupCheck, { path })
   },
 
   demo: {

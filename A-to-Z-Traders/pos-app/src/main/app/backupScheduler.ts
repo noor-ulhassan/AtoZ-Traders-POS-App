@@ -1,5 +1,4 @@
-import { runScheduledBackup, scheduleInputs } from '../services/backupService'
-import { isBackupDue } from '../services/backupRetention'
+import { runScheduledBackup } from '../services/backupService'
 import { logger } from '../utils/logger'
 
 const log = logger.child('backup-schedule')
@@ -19,7 +18,6 @@ let timer: NodeJS.Timeout | null = null
 
 async function tick(): Promise<void> {
   try {
-    if (!isBackupDue({ ...scheduleInputs(), now: Date.now() })) return
     await runScheduledBackup()
   } catch (error) {
     // runScheduledBackup already records its own failures; anything reaching
@@ -32,6 +30,7 @@ export function startBackupScheduler(): void {
   if (timer) return
 
   timer = setInterval(() => void tick(), TICK_MS)
+  void tick()
   // Never hold the process open on the app's account.
   timer.unref()
   log.info('automatic backup scheduler started')

@@ -50,7 +50,8 @@ if (!hasLock) {
     // A shop machine can stay open for weeks. Backing up only on a clean quit
     // would mean a single power cut loses everything since the last close, so
     // the scheduler also snapshots while the app runs — using SQLite's online
-    // backup, which is safe mid-sale. A no-op until a folder is configured.
+    // backup, which is safe mid-sale. Local recovery starts automatically;
+    // an optional additional destination follows the owner's saved schedule.
     startBackupScheduler()
 
     // Phone access, if the owner has switched it on. A no-op otherwise, and it

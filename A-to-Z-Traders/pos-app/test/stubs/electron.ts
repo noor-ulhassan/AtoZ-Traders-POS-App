@@ -37,6 +37,9 @@ export const dialog = {
   showErrorBox: (): void => undefined
 }
 
-export const shell = { openExternal: async (): Promise<void> => undefined }
+export const shell = {
+  openExternal: async (): Promise<void> => undefined,
+  openPath: async (): Promise<string> => ''
+}
 
 export const BrowserWindow = class {}

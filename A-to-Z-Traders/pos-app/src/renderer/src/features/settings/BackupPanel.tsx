@@ -1,22 +1,21 @@
 import type { JSX } from 'react'
-import { useState } from 'react'
-import type { BackupFile, BackupHealth, BackupStatus, Settings } from '@shared/types'
+import { useEffect, useState } from 'react'
+import type { BackupCheck, BackupDestinationStatus, BackupFile, Settings } from '@shared/types'
 import { Button } from '../../components/ui/Button'
 import { Field, Input, Select } from '../../components/ui/Field'
 import { Badge, Callout } from '../../components/ui/Feedback'
 import { Card, CardBody, CardHeader } from '../../components/ui/Surface'
 import { Column, DataTable } from '../../components/ui/DataTable'
-import { useConfirm } from '../../components/ui/Confirm'
 import { useMutation } from '../../hooks/useMutation'
 import { useQuery } from '../../hooks/useQuery'
 import { useToast } from '../../components/ui/Toast'
+import { useSettings } from '../../app/SettingsContext'
 import { api, unwrap } from '../../lib/api'
 import * as format from '../../lib/format'
 
 interface BackupPanelProps {
   form: Settings
   set: <K extends keyof Settings>(key: K, value: Settings[K]) => void
-  /** True while the folder or interval on screen differ from what is saved. */
   isDirty: boolean
   onRestored: (safetyCopyPath: string) => void
 }
@@ -30,140 +29,193 @@ const INTERVALS = [
   { value: 0, label: 'Only when I close the app' }
 ]
 
-/** What each state means, said the way the owner would say it. */
-const HEALTH: Record<BackupHealth, { tone: 'good' | 'warn' | 'bad' | 'neutral'; label: string }> = {
-  off: { tone: 'neutral', label: 'Off' },
-  never: { tone: 'warn', label: 'Not yet run' },
-  ok: { tone: 'good', label: 'Protected' },
-  stale: { tone: 'warn', label: 'Out of date' },
-  failing: { tone: 'bad', label: 'Failing' }
+function Destination({
+  title,
+  data
+}: {
+  title: string
+  data: BackupDestinationStatus
+}): JSX.Element {
+  const label =
+    data.health === 'failing'
+      ? 'Needs attention'
+      : data.health === 'never'
+        ? 'Waiting for first copy'
+        : data.health === 'stale'
+          ? 'Backup overdue'
+          : data.pendingChanges
+            ? 'Changes awaiting backup'
+            : 'No new changes'
+  const tone =
+    data.health === 'failing'
+      ? 'bad'
+      : data.health === 'stale' || data.health === 'never'
+        ? 'warn'
+        : 'neutral'
+  return (
+    <div className="rounded-md border border-line p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-medium">{title}</h3>
+        <Badge tone={tone}>{label}</Badge>
+      </div>
+      <p className="mt-2 font-mono text-caption break-all" data-selectable>
+        {data.folder}
+      </p>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <dt className="text-ink-muted">Latest backup file</dt>
+        <dd className="text-right">
+          {data.lastBackupAt ? format.dateTime(data.lastBackupAt) : 'Not yet created'}
+        </dd>
+        <dt className="text-ink-muted">Last verification</dt>
+        <dd className="text-right">
+          {data.lastVerifiedAt
+            ? new Date(data.lastVerifiedAt).toLocaleString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              })
+            : 'Not recorded'}
+        </dd>
+        <dt className="text-ink-muted">Copies available</dt>
+        <dd className="text-right">{data.count}</dd>
+      </dl>
+      {data.lastError && (
+        <div className="mt-3">
+          <Callout tone="bad" title="Last attempt failed">
+            {data.lastError} Connect the drive or check folder access, then retry Back up now.
+          </Callout>
+        </div>
+      )}
+    </div>
+  )
 }
 
-function headline(status: BackupStatus): string {
-  switch (status.health) {
-    case 'off':
-      return 'Your records exist in one place, on this computer only.'
-    case 'never':
-      return 'A folder is set, but no backup has been written to it yet.'
-    case 'ok':
-      return `Backing up automatically. Last copy ${format.dateTime(status.lastBackupAt)}.`
-    case 'stale':
-      return `The newest backup is from ${format.dateTime(status.lastBackupAt)} — over a day old.`
-    case 'failing':
-      return 'The last backup did not complete.'
-  }
-}
-
-/**
- * Whether backups are actually happening — and if not, why.
- *
- * A backup that quietly stopped working looks exactly like one that works,
- * right up until the day it is needed. So the state is stated plainly at the
- * top of the card, an out-of-date or failing schedule is called out rather
- * than left to be noticed, and the copies themselves are listed so the owner
- * can see with their own eyes that they exist.
- */
 export function BackupPanel({ form, set, isDirty, onRestored }: BackupPanelProps): JSX.Element {
-  const confirm = useConfirm()
   const toast = useToast()
+  const { settings } = useSettings()
   const [showAll, setShowAll] = useState(false)
-
-  const status = useQuery(() => unwrap(api.backup.status()), [])
-  const backups = useQuery(() => unwrap(api.backup.list()), [])
-
+  const [checked, setChecked] = useState<BackupCheck | null>(null)
+  const status = useQuery(
+    () => unwrap(api.backup.status()),
+    [settings.autoBackupDir, settings.backupIntervalMinutes]
+  )
+  const backups = useQuery(() => unwrap(api.backup.list()), [settings.autoBackupDir])
+  const refreshStatus = status.refetch
+  const refreshFiles = backups.refetch
   const refresh = (): void => {
-    status.refetch()
-    backups.refetch()
+    refreshStatus()
+    refreshFiles()
   }
+  useEffect(() => {
+    const timer = setInterval(() => {
+      refreshStatus()
+      refreshFiles()
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [refreshStatus, refreshFiles])
 
-  const runNow = useMutation(async () => unwrap(api.backup.runNow()), {
-    errorTitle: 'Backup failed',
-    onSuccess: (result) => {
-      if (!result) return
-      toast.success('Backup written', `${result.path} (${format.fileSize(result.size)})`)
-      refresh()
+  const runNow = useMutation(
+    async () => {
+      try {
+        return await unwrap(api.backup.runNow())
+      } finally {
+        refresh()
+      }
+    },
+    {
+      errorTitle: 'Check backup destinations',
+      onSuccess: () => toast.success('Backups completed and checked')
+    }
+  )
+  const saveCopy = useMutation(
+    async () => {
+      try {
+        return await unwrap(api.backup.now())
+      } finally {
+        refresh()
+      }
+    },
+    {
+      errorTitle: 'Backup failed',
+      onSuccess: (result) => toast.success('Copy saved and checked', result.path)
+    }
+  )
+  const browse = useMutation(async () => unwrap(api.backup.chooseFolder()), {
+    onSuccess: (folder) => {
+      if (folder) set('autoBackupDir', folder)
     }
   })
-
-  const saveCopy = useMutation(async () => unwrap(api.backup.now()), {
-    errorTitle: 'Backup failed',
-    onSuccess: (result) => {
-      if (!result) return
-      toast.success('Copy saved', `${result.path} (${format.fileSize(result.size)})`)
+  const openFolder = useMutation(
+    async (kind: 'data' | 'local' | 'additional') => unwrap(api.backup.openFolder(kind)),
+    {
+      errorTitle: 'Could not open folder'
     }
-  })
-
-  const restoreFrom = useMutation(async (path: string) => unwrap(api.backup.restoreFrom(path)), {
-    errorTitle: 'Restore failed',
-    onSuccess: (result) => {
-      if (result) onRestored(result.safetyCopyPath)
+  )
+  const check = useMutation(
+    async (path?: string) => {
+      setChecked(null)
+      try {
+        return await unwrap(api.backup.check(path))
+      } finally {
+        refresh()
+      }
+    },
+    { errorTitle: 'Backup check failed', onSuccess: setChecked }
+  )
+  const restore = useMutation(
+    async (path?: string) => unwrap(path ? api.backup.restoreFrom(path) : api.backup.restore()),
+    {
+      errorTitle: 'Restore failed',
+      onSuccess: (result) => onRestored(result.safetyCopyPath)
     }
-  })
-
-  const restoreFile = useMutation(async () => unwrap(api.backup.restore()), {
-    errorTitle: 'Restore failed',
-    onSuccess: (result) => {
-      if (result) onRestored(result.safetyCopyPath)
-    }
-  })
-
-  const askRestoreFile = async (): Promise<void> => {
-    const ok = await confirm({
-      title: 'Restore from a backup file?',
-      message:
-        'This replaces everything currently in the app with the contents of the file you choose — a copy on a USB drive, say. A copy of your current data is kept, and you will be asked to confirm once more.',
-      confirmLabel: 'Choose a file',
-      destructive: true
-    })
-    if (ok) await restoreFile.run()
-  }
-
-  const askRestore = async (file: BackupFile): Promise<void> => {
-    const ok = await confirm({
-      title: `Restore the backup from ${format.dateTime(file.createdAt)}?`,
-      message:
-        'Everything currently in the app will be replaced by what this backup holds. A copy of your current data is kept, and you will be asked to confirm once more.',
-      confirmLabel: 'Continue',
-      destructive: true
-    })
-    if (ok) await restoreFrom.run(file.path)
-  }
-
+  )
+  const busy =
+    runNow.isPending ||
+    saveCopy.isPending ||
+    browse.isPending ||
+    check.isPending ||
+    restore.isPending
   const data = status.data
   const files = backups.data ?? []
   const shown = showAll ? files : files.slice(0, 8)
-  const health = HEALTH[data?.health ?? 'off']
-
   const columns: Column<BackupFile>[] = [
     {
       key: 'when',
-      header: 'Taken',
+      header: 'Backup',
       render: (file) => (
-        <span className="flex flex-col gap-px py-1 leading-[1.35]">
+        <div className="flex flex-col gap-1 py-1">
           <strong className="font-medium">{format.dateTime(file.createdAt)}</strong>
-          <span className="font-mono text-caption text-ink-subtle">{file.fileName}</span>
-        </span>
+          <span className="text-caption text-ink-muted">
+            {file.location === 'local' ? 'This computer' : 'Additional folder'} /{' '}
+            {format.fileSize(file.size)}
+          </span>
+          <span className="text-caption text-ink-subtle">
+            {file.verifiedAt ? 'Checked copy' : 'Check before restoring'}
+          </span>
+        </div>
       )
-    },
-    {
-      key: 'size',
-      header: 'Size',
-      numeric: true,
-      width: '110px',
-      render: (file) => format.fileSize(file.size)
     },
     {
       key: 'actions',
       header: '',
-      width: '110px',
       render: (file) => (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-1">
           <Button
             size="sm"
             variant="ghost"
-            icon="restore"
-            loading={restoreFrom.isPending}
-            onClick={() => void askRestore(file)}
+            disabled={busy}
+            onClick={() => void check.run(file.path)}
+          >
+            Check backup
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void restore.run(file.path)}
           >
             Restore
           </Button>
@@ -175,145 +227,159 @@ export function BackupPanel({ form, set, isDirty, onRestored }: BackupPanelProps
   return (
     <Card>
       <CardHeader
-        title="Backups"
-        subtitle="Keeping a copy of your records somewhere other than this computer"
-        actions={<Badge tone={health.tone}>{health.label}</Badge>}
+        title="Data & backups"
+        subtitle="Automatic recovery copies, with a separate copy wherever you choose"
       />
       <CardBody>
-        <p className="text-sm text-ink-muted">{data ? headline(data) : 'Checking…'}</p>
-
-        {data?.health === 'failing' && data.lastError && (
+        <p className="text-sm text-ink-muted">
+          Local recovery copies are made every 15 minutes while the app is open and records have
+          changed, and again on normal close. You can inspect and restore .db backups here without
+          another app.
+        </p>
+        {status.error && (
           <div className="mt-3">
-            <Callout tone="bad" title="The last backup did not complete">
-              {data.lastError} Check the folder still exists and has space, then press &ldquo;Back
-              up now&rdquo;.
+            <Callout tone="bad" title="Backup status unavailable">
+              {status.error}
             </Callout>
           </div>
         )}
-
-        {data?.health === 'stale' && (
+        {data?.historyError && (
           <div className="mt-3">
-            <Callout tone="warn" title="Backups have fallen behind">
-              The app only backs up while it is running and something has changed. If this computer
-              has been off, this is expected — press &ldquo;Back up now&rdquo; to catch up.
+            <Callout tone="warn" title="Backup history needs attention">
+              {data.historyError}
             </Callout>
           </div>
         )}
-
-        {data?.health === 'off' && (
-          <div className="mt-3">
-            <Callout tone="warn" title="Nothing is being backed up">
-              If this computer fails or is stolen, your records go with it. Set a folder below — one
-              that Google Drive or OneDrive syncs is best, because then the copies leave the
-              building.
-            </Callout>
-          </div>
-        )}
-
+        <div className="mt-4 flex flex-col gap-3">
+          {data ? (
+            <Destination title="Local recovery" data={data.local} />
+          ) : (
+            <p>Checking local backups...</p>
+          )}
+          {data?.additional && <Destination title="Additional copy" data={data.additional} />}
+        </div>
+        <p className="mt-3 text-caption text-ink-muted">
+          Local copies are on this computer. For recovery if the computer fails, keep another copy
+          on a separate device or outside the shop. A copy saved to a sync folder does not confirm a
+          cloud upload.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => void openFolder.run('local')}>
+            Open local backups
+          </Button>
+          <Button size="sm" onClick={() => void openFolder.run('data')}>
+            Open data folder
+          </Button>
+          {data?.additional && (
+            <Button size="sm" disabled={isDirty} onClick={() => void openFolder.run('additional')}>
+              Open additional folder
+            </Button>
+          )}
+        </div>
         <div className="mt-5 flex flex-col gap-4">
           <Field
-            label="Backup folder"
-            hint="Leave empty to turn automatic backups off. A folder synced by Google Drive or OneDrive keeps your records safe even if this computer does not survive."
+            label="Additional backup folder"
+            hint="Optional. Use Browse to choose a USB drive or sync folder. Leaving this empty keeps local recovery enabled."
           >
-            <Input
-              className="font-mono"
-              value={form.autoBackupDir}
-              placeholder="C:\Users\You\Google Drive\POS-backups"
-              onChange={(event) => set('autoBackupDir', event.target.value)}
-            />
+            <div className="flex gap-2">
+              <Input
+                className="min-w-0 flex-1 font-mono"
+                value={form.autoBackupDir}
+                placeholder="Choose an additional destination"
+                onChange={(event) => set('autoBackupDir', event.target.value)}
+              />
+              <Button disabled={busy} onClick={() => void browse.run()}>
+                Browse
+              </Button>
+            </div>
           </Field>
-
-          <Field
-            label="How often"
-            hint="Backups are skipped when nothing has changed, so a quiet day does not fill the folder."
-          >
-            <Select
-              value={String(form.backupIntervalMinutes)}
-              onChange={(event) => set('backupIntervalMinutes', Number(event.target.value))}
+          {form.autoBackupDir.trim() && (
+            <Field
+              label="Additional copy schedule"
+              hint="Unavailable destinations retry while the app is open. Local recovery continues independently."
             >
-              {INTERVALS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
+              <Select
+                value={String(form.backupIntervalMinutes)}
+                onChange={(event) => set('backupIntervalMinutes', Number(event.target.value))}
+              >
+                {INTERVALS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           {isDirty && (
             <Callout tone="info">
-              Press Save at the top of the page to start using these backup settings.
+              Save changes at the top of Settings before backing up to the new destination.
             </Callout>
           )}
         </div>
-
-        {data && data.folder.trim() !== '' && (
-          <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-line bg-surface-sunken p-4 text-sm">
-            <span className="text-ink-muted">Copies kept</span>
-            <span className="text-right tabular-nums">{data.count}</span>
-
-            <span className="text-ink-muted">Oldest</span>
-            <span className="text-right tabular-nums">
-              {data.oldestBackupAt ? format.dateTime(data.oldestBackupAt) : '—'}
-            </span>
-
-            <span className="text-ink-muted">Space used</span>
-            <span className="text-right tabular-nums">{format.fileSize(data.totalSize)}</span>
-
-            <span className="text-ink-muted">Space free</span>
-            <span className="text-right tabular-nums">
-              {data.freeSpace === null ? '—' : format.fileSize(data.freeSpace)}
-            </span>
-          </div>
-        )}
-
         <div className="mt-5 flex flex-wrap gap-2">
           <Button
             variant="primary"
             icon="backup"
+            disabled={busy || isDirty}
             loading={runNow.isPending}
-            disabled={form.autoBackupDir.trim() === ''}
             onClick={() => void runNow.run()}
           >
             Back up now
           </Button>
-          <Button icon="download" loading={saveCopy.isPending} onClick={() => void saveCopy.run()}>
+          <Button disabled={busy} onClick={() => void saveCopy.run()}>
             Save a copy elsewhere
           </Button>
-          <Button
-            variant="danger"
-            icon="restore"
-            loading={restoreFile.isPending}
-            onClick={() => void askRestoreFile()}
-          >
+          <Button disabled={busy} onClick={() => void check.run()}>
+            Check a backup file
+          </Button>
+          <Button variant="danger" disabled={busy} onClick={() => void restore.run()}>
             Restore from a file
           </Button>
         </div>
-
-        {files.length > 0 && (
-          <div className="mt-6">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-micro font-semibold tracking-[0.07em] text-ink-subtle uppercase">
-                Restore a backup
-              </span>
-              {files.length > shown.length && (
-                <Button size="sm" variant="ghost" onClick={() => setShowAll(true)}>
-                  Show all {files.length}
-                </Button>
-              )}
-            </div>
-            <div className="overflow-hidden rounded-md border border-line">
-              <DataTable
-                columns={columns}
-                rows={shown}
-                rowKey={(file) => file.fileName}
-                compact
-                isLoading={backups.isLoading}
-                error={backups.error}
-                onRetry={backups.refetch}
-              />
-            </div>
+        <p className="mt-2 text-caption text-ink-muted">
+          Manual copies are kept until you remove them. Automatic copies are thinned over time,
+          keeping recent copies plus daily and weekly recovery points.
+        </p>
+        {checked && (
+          <div className="mt-4">
+            <Callout tone="info" title="Backup check passed">
+              <p className="font-medium">{checked.businessName || 'Shop backup'}</p>
+              <p>
+                {checked.counts.sales} bills, {checked.counts.products} products,{' '}
+                {checked.counts.customers} customers, {checked.counts.suppliers} suppliers,{' '}
+                {checked.counts.purchases} purchases
+              </p>
+              <p className="mt-1 text-caption break-all" data-selectable>
+                {checked.path}
+              </p>
+              <p className="mt-1">
+                This copy opens with the current app. Your current shop was not replaced.
+              </p>
+            </Callout>
           </div>
         )}
+        <div className="mt-6">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="font-medium">Available backups</h3>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={refresh}>
+              Refresh
+            </Button>
+          </div>
+          <DataTable
+            columns={columns}
+            rows={shown}
+            rowKey={(file) => file.path}
+            compact
+            isLoading={backups.isLoading}
+            error={backups.error}
+            onRetry={refreshFiles}
+          />
+          {!showAll && files.length > shown.length && (
+            <Button size="sm" variant="ghost" onClick={() => setShowAll(true)}>
+              Show all {files.length}
+            </Button>
+          )}
+        </div>
       </CardBody>
     </Card>
   )

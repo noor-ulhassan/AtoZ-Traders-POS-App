@@ -1,4 +1,4 @@
-import { app, dialog } from 'electron'
+import { app, dialog, shell } from 'electron'
 import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import {
@@ -14,6 +14,8 @@ import {
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import type {
   BackupFile,
+  BackupCheck,
+  BackupDestinationStatus,
   BackupHealth,
   BackupResult,
   BackupStatus,
@@ -28,7 +30,14 @@ import { getDb } from '../db/connection'
 import { AppError, businessRule } from '../utils/errors'
 import { isBusy, underMaintenance } from '../ipc/maintenance'
 import { logger } from '../utils/logger'
-import { planRetention } from './backupRetention'
+import { isBackupDue, planRetention } from './backupRetention'
+import {
+  pathKey,
+  readBackupHistory,
+  recordBackupAttempt,
+  recordVerifiedBackup,
+  verifiedRecord
+} from './backupHistory'
 
 const log = logger.child('backup')
 
@@ -39,6 +48,19 @@ const NAME_PATTERN = /^pos-backup-(\d{8})-(\d{6})(?:-\d+)?\.db$/
 /** A backup still being written. Renamed into place only once it is complete. */
 const PART_SUFFIX = '.part'
 const pendingBackupPaths = new Set<string>()
+const LOCAL_INTERVAL = 15
+
+export function localBackupFolder(): string {
+  return join(app.getPath('userData'), 'backups')
+}
+
+function destinations(): { folder: string; intervalMinutes: number }[] {
+  const settings = getSettings(getDb())
+  const local = { folder: localBackupFolder(), intervalMinutes: LOCAL_INTERVAL }
+  return settings.autoBackupDir.trim() && pathKey(settings.autoBackupDir) !== pathKey(local.folder)
+    ? [local, { folder: settings.autoBackupDir, intervalMinutes: settings.backupIntervalMinutes }]
+    : [local]
+}
 
 /** Reserve before the first await; manual and scheduled copies may overlap. */
 function reserveBackupPath(folder: string): string {
@@ -98,8 +120,8 @@ export function timestampFromFileName(fileName: string): string | null {
  * folder, never the file the app is writing to.
  */
 export function assertBackupFolderIsSafe(folder: string): void {
-  const target = resolve(folder)
-  const liveDir = resolve(dirname(databasePath()))
+  const target = pathKey(folder)
+  const liveDir = pathKey(dirname(databasePath()))
 
   const contains = (parent: string, child: string): boolean =>
     child === parent || child.startsWith(parent.endsWith(sep) ? parent : parent + sep)
@@ -120,6 +142,8 @@ function ensureFolder(folder: string): string {
   const target = resolve(folder)
   assertBackupFolderIsSafe(target)
   if (!existsSync(target)) mkdirSync(target, { recursive: true })
+  if (!statSync(target).isDirectory())
+    throw businessRule('Choose a folder, not a file, for backups.')
   return target
 }
 
@@ -142,7 +166,8 @@ export function listBackups(folder: string): BackupFile[] {
 
     const path = join(target, fileName)
     try {
-      files.push({ path, fileName, size: statSync(path).size, createdAt })
+      const stat = statSync(path)
+      if (stat.isFile()) files.push({ path, fileName, size: stat.size, createdAt })
     } catch {
       // A file that vanished between the listing and the stat — a sync client
       // moving things around. It is simply not in the list.
@@ -154,7 +179,19 @@ export function listBackups(folder: string): BackupFile[] {
 
 /** Deletes what the retention policy no longer wants. Never throws. */
 export function pruneBackups(folder: string): number {
-  const { remove } = planRetention(listBackups(folder))
+  let remove: BackupFile[]
+  try {
+    const history = readBackupHistory()
+    // Only automatic copies recorded by this installation are eligible.
+    // Manual exports and older unrecorded backups stay under the owner's control.
+    const automatic = listBackups(folder).filter(
+      (file) => verifiedRecord(history, file.path)?.automatic
+    )
+    remove = planRetention(automatic).remove
+  } catch (error) {
+    log.warn('retention skipped because backup history could not be read', error)
+    return 0
+  }
 
   let deleted = 0
   for (const file of remove) {
@@ -178,7 +215,7 @@ function describe(path: string): BackupResult {
   return {
     path,
     size,
-    createdAt: new Date().toISOString().slice(0, 19).replace('T', ' ')
+    createdAt: timestampFromFileName(basename(path))!
   }
 }
 
@@ -191,7 +228,7 @@ function describe(path: string): BackupResult {
  * checkpoint, and a backup that silently loses today's sales is worse than no
  * backup at all.
  */
-export function copyDatabaseTo(targetDir: string): BackupResult {
+export function copyDatabaseTo(targetDir: string, automatic = false): BackupResult {
   const folder = ensureFolder(targetDir)
   checkpoint()
 
@@ -199,6 +236,7 @@ export function copyDatabaseTo(targetDir: string): BackupResult {
   const partial = `${target}${PART_SUFFIX}`
   try {
     copyFileSync(databasePath(), partial)
+    assertUsableBackup(partial)
     renameSync(partial, target)
   } finally {
     pendingBackupPaths.delete(target)
@@ -209,6 +247,7 @@ export function copyDatabaseTo(targetDir: string): BackupResult {
     }
   }
   log.info(`backup copied to ${target}`)
+  rememberVerified(target, automatic)
   return describe(target)
 }
 
@@ -221,7 +260,7 @@ export function copyDatabaseTo(targetDir: string): BackupResult {
  * renamed only once complete, so an interrupted run can never leave something
  * that looks like a usable backup but is half a database.
  */
-export async function onlineBackupTo(targetDir: string): Promise<BackupResult> {
+export async function onlineBackupTo(targetDir: string, automatic = false): Promise<BackupResult> {
   if (isBusy())
     throw businessRule('A restore is in progress. Try the backup again when it finishes.')
   const folder = ensureFolder(targetDir)
@@ -230,6 +269,7 @@ export async function onlineBackupTo(targetDir: string): Promise<BackupResult> {
 
   try {
     await getDb().backup(partial)
+    assertUsableBackup(partial)
     renameSync(partial, target)
   } catch (error) {
     try {
@@ -244,6 +284,7 @@ export async function onlineBackupTo(targetDir: string): Promise<BackupResult> {
   }
 
   log.info(`backup written to ${target}`)
+  rememberVerified(target, automatic)
   return describe(target)
 }
 
@@ -264,129 +305,167 @@ export async function backupNow(): Promise<BackupResult> {
 
 // ------------------------------------------------------- the running record
 
-/** What this session knows about how the schedule is going. */
-interface SessionState {
-  lastBackupAt: number | null
-  changeCountAtLastBackup: number | null
-  lastError: string | null
-  running: boolean
+interface DestinationSession {
+  db: ReturnType<typeof getDb>
+  lastBackupAt: number
+  changeCountAtLastBackup: number
+  path: string
+}
+const sessions = new Map<string, DestinationSession>()
+let running = false
+let historyWriteError: string | null = null
+
+function historyFailure(error: unknown): void {
+  historyWriteError = 'Backup history could not be saved. Check free space and folder permissions.'
+  log.warn(historyWriteError, error)
 }
 
-const session: SessionState = {
-  lastBackupAt: null,
-  changeCountAtLastBackup: null,
-  lastError: null,
-  running: false
+function rememberVerified(path: string, automatic: boolean): void {
+  try {
+    recordVerifiedBackup(path, automatic)
+    historyWriteError = null
+  } catch (error) {
+    historyFailure(error)
+  }
 }
 
-/**
- * Rows written on this connection since it opened.
- *
- * The cheapest honest answer to "has anything happened since the last backup?"
- * — it is a counter SQLite already maintains, so asking costs nothing. It
- * resets when the app restarts, which is why a fresh session always takes one
- * backup before it starts skipping.
- */
+function rememberAttempt(folder: string, error: string | null): void {
+  try {
+    recordBackupAttempt(folder, error)
+  } catch (caught) {
+    historyFailure(caught)
+  }
+}
+
+/** Counts business writes only; backup history lives outside this database. */
 export function changeCount(): number {
-  try {
-    const row = getDb().prepare<[], { n: number }>('SELECT total_changes() AS n').get()
-    return row?.n ?? 0
-  } catch {
-    return 0
-  }
+  const row = getDb().prepare<[], { n: number }>('SELECT total_changes() AS n').get()
+  return row?.n ?? 0
 }
 
-/** Test seam: forgets what this session did. */
+/** Reset after a restore or a new connection. Persistent history stays intact. */
 export function resetBackupSession(): void {
-  session.lastBackupAt = null
-  session.changeCountAtLastBackup = null
-  session.lastError = null
-  session.running = false
+  sessions.clear()
+  running = false
+  historyWriteError = null
 }
 
-/**
- * Takes a scheduled backup into the configured folder and prunes what has aged
- * out.
- *
- * Failures are recorded rather than thrown: the caller is a timer, and there is
- * nobody to show an error to at the moment it happens. The record surfaces on
- * the Settings screen instead, which is the fix for the older behaviour where a
- * backup could stop working and leave no trace anywhere.
- */
-export async function runScheduledBackup(): Promise<BackupResult | null> {
-  if (session.running) return null
-
-  const { autoBackupDir } = getSettings(getDb())
-  if (!autoBackupDir.trim()) return null
-
-  session.running = true
-  try {
-    const result = await onlineBackupTo(autoBackupDir)
-    session.lastBackupAt = Date.now()
-    session.changeCountAtLastBackup = changeCount()
-    session.lastError = null
-    pruneBackups(autoBackupDir)
-    return result
-  } catch (error) {
-    session.lastError = error instanceof Error ? error.message : String(error)
-    log.error('scheduled backup failed', error)
-    return null
-  } finally {
-    session.running = false
-  }
+function currentSession(folder: string): DestinationSession | undefined {
+  const entry = sessions.get(pathKey(folder))
+  return entry?.db === getDb() ? entry : undefined
 }
 
-/**
- * Backs up to the configured folder on demand.
- *
- * The same work the schedule does, minus the "is it due?" question — this is
- * the owner pressing the button, and a backup they asked for is always due.
- * Errors reach them as an error, rather than being recorded quietly the way a
- * timer's failure has to be.
- */
-export async function backupToConfiguredFolder(): Promise<BackupResult> {
-  const { autoBackupDir } = getSettings(getDb())
-  if (!autoBackupDir.trim()) {
-    throw businessRule('Set a backup folder first, then this button will fill it automatically.')
-  }
+function isDue(folder: string, intervalMinutes: number): boolean {
+  const entry = currentSession(folder)
+  if (intervalMinutes > 0 && entry && !existsSync(entry.path)) return true
+  return isBackupDue({
+    folder,
+    intervalMinutes,
+    now: Date.now(),
+    lastBackupAt: entry?.lastBackupAt ?? null,
+    changeCount: changeCount(),
+    changeCountAtLastBackup: entry?.changeCountAtLastBackup ?? null
+  })
+}
 
+async function takeDestination(folder: string, automatic: boolean): Promise<BackupResult> {
+  const db = getDb()
+  // Capture BEFORE the asynchronous snapshot. Writes during it remain pending,
+  // even if SQLite happened to include them; we must never claim missing writes are protected.
+  const changes = changeCount()
   try {
-    const result = await onlineBackupTo(autoBackupDir)
-    session.lastBackupAt = Date.now()
-    session.changeCountAtLastBackup = changeCount()
-    session.lastError = null
-    pruneBackups(autoBackupDir)
+    const result = await onlineBackupTo(folder, automatic)
+    sessions.set(pathKey(folder), {
+      db,
+      lastBackupAt: Date.now(),
+      changeCountAtLastBackup: changes,
+      path: result.path
+    })
+    rememberAttempt(folder, null)
+    if (automatic) pruneBackups(folder)
     return result
   } catch (error) {
-    session.lastError = error instanceof Error ? error.message : String(error)
+    rememberAttempt(folder, error instanceof Error ? error.message : String(error))
     throw error
   }
 }
 
-/** The backups in the configured folder, newest first. */
-export function listConfiguredBackups(): BackupFile[] {
-  return listBackups(getSettings(getDb()).autoBackupDir)
-}
-
-/** What the scheduler needs to decide whether to act. Read fresh each tick. */
-export function scheduleInputs(): {
-  folder: string
-  intervalMinutes: number
-  lastBackupAt: number | null
-  changeCount: number
-  changeCountAtLastBackup: number | null
-} {
-  const settings = getSettings(getDb())
-  return {
-    folder: settings.autoBackupDir,
-    intervalMinutes: settings.backupIntervalMinutes,
-    lastBackupAt: session.lastBackupAt,
-    changeCount: changeCount(),
-    changeCountAtLastBackup: session.changeCountAtLastBackup
+/** Each destination is independent: an unavailable external folder cannot stop local recovery. */
+export async function runScheduledBackup(): Promise<BackupResult | null> {
+  if (running || isBusy()) return null
+  running = true
+  let result: BackupResult | null = null
+  try {
+    for (const target of destinations()) {
+      if (!isDue(target.folder, target.intervalMinutes)) continue
+      try {
+        result = await takeDestination(target.folder, true)
+      } catch (error) {
+        log.error('scheduled backup failed', error)
+      }
+    }
+    return result
+  } finally {
+    running = false
   }
 }
 
-/** Bytes free on the volume holding `folder`; null when it cannot be read. */
+/** Manual copies are retained until the owner removes them. */
+export async function backupToConfiguredFolder(): Promise<BackupResult> {
+  if (running || isBusy())
+    throw businessRule('A backup or restore is already in progress. Try again when it finishes.')
+  running = true
+  let result: BackupResult | null = null
+  const failures: string[] = []
+  try {
+    for (const target of destinations()) {
+      try {
+        result = await takeDestination(target.folder, false)
+      } catch (error) {
+        failures.push(`${target.folder}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    if (failures.length)
+      throw businessRule(
+        `${result ? 'A backup was saved, but another destination failed.' : 'Backup failed.'} ${failures.join(' ')}`
+      )
+    return result as BackupResult
+  } finally {
+    running = false
+  }
+}
+
+/** Includes local recovery and the configured additional folder. */
+export function listConfiguredBackups(): BackupFile[] {
+  let history: ReturnType<typeof readBackupHistory> | null = null
+  try {
+    history = readBackupHistory()
+  } catch {
+    /* Status surfaces the history error. */
+  }
+  const files: BackupFile[] = []
+  for (const [index, target] of destinations().entries()) {
+    try {
+      for (const file of listBackups(target.folder)) {
+        let verifiedAt: string | null = null
+        try {
+          verifiedAt = history ? (verifiedRecord(history, file.path)?.verifiedAt ?? null) : null
+        } catch {
+          /* disappeared */
+        }
+        files.push({ ...file, verifiedAt, location: index === 0 ? 'local' : 'additional' })
+      }
+    } catch {
+      /* An unavailable additional destination must not hide local copies. */
+    }
+  }
+  return files.sort(
+    (a, b) =>
+      b.createdAt.localeCompare(a.createdAt) ||
+      b.fileName.localeCompare(a.fileName, undefined, { numeric: true })
+  )
+}
+
 function freeSpaceFor(folder: string): number | null {
   try {
     const stats = statfsSync(resolve(folder))
@@ -396,39 +475,163 @@ function freeSpaceFor(folder: string): number | null {
   }
 }
 
-const A_DAY = 24 * 60 * 60 * 1000
-
-function healthOf(
-  folder: string,
-  newest: BackupFile | undefined,
-  error: string | null
-): BackupHealth {
-  if (folder.trim() === '') return 'off'
-  if (error) return 'failing'
-  if (!newest) return 'never'
-
-  const age = Date.now() - Date.parse(newest.createdAt.replace(' ', 'T'))
-  return Number.isNaN(age) || age > A_DAY ? 'stale' : 'ok'
+export function backupStatus(): BackupStatus {
+  let history: ReturnType<typeof readBackupHistory> = { destinations: {}, files: {} }
+  let historyError = historyWriteError
+  try {
+    history = readBackupHistory()
+  } catch {
+    historyError =
+      'Backup history cannot be read. Existing backup files are still available; use Check backup to inspect a copy.'
+  }
+  const targets = destinations()
+  const allFiles = listConfiguredBackups()
+  const statuses = targets.map((target): BackupDestinationStatus => {
+    const entry = currentSession(target.folder)
+    const attempt = history.destinations[pathKey(target.folder)]
+    const files = allFiles.filter((file) => pathKey(dirname(file.path)) === pathKey(target.folder))
+    let lastError = attempt?.error ?? null
+    try {
+      if (existsSync(target.folder)) readdirSync(target.folder)
+    } catch {
+      lastError = 'The backup folder cannot be read. Check the drive and folder permissions.'
+    }
+    const pendingChanges = !entry || changeCount() !== entry.changeCountAtLastBackup
+    const verified = files.find((file) => file.verifiedAt)
+    const lastBackupAt = files[0]?.createdAt ?? null
+    const elapsed = lastBackupAt
+      ? Date.now() - Date.parse(lastBackupAt.replace(' ', 'T'))
+      : Infinity
+    const threshold = (target.intervalMinutes || 24 * 60) * 60_000 + 60_000
+    const health: BackupHealth = lastError
+      ? 'failing'
+      : !files.length
+        ? 'never'
+        : pendingChanges && elapsed > threshold
+          ? 'stale'
+          : 'ok'
+    return {
+      folder: target.folder,
+      intervalMinutes: target.intervalMinutes,
+      health,
+      lastBackupAt,
+      lastVerifiedAt: verified?.verifiedAt ?? null,
+      lastAttemptAt: attempt?.attemptedAt ?? null,
+      lastError,
+      count: files.length,
+      pendingChanges
+    }
+  })
+  const local = statuses[0]!
+  const additional = statuses[1] ?? null
+  // Preserve legacy summary fields for callers, with additional details below.
+  const primary = additional ?? local
+  const primaryFiles = allFiles.filter(
+    (file) => pathKey(dirname(file.path)) === pathKey(primary.folder)
+  )
+  return {
+    ...primary,
+    local,
+    additional,
+    historyError,
+    lastBackupSize: primaryFiles[0]?.size ?? 0,
+    oldestBackupAt: primaryFiles.at(-1)?.createdAt ?? null,
+    totalSize: primaryFiles.reduce((sum, file) => sum + file.size, 0),
+    freeSpace: freeSpaceFor(primary.folder)
+  }
 }
 
-export function backupStatus(): BackupStatus {
-  const settings = getSettings(getDb())
-  const folder = settings.autoBackupDir
-  const files = listBackups(folder)
-  const newest = files[0]
-  const oldest = files[files.length - 1]
+export async function chooseBackupFolder(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: 'Choose an additional backup folder',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Use this folder'
+  })
+  if (result.canceled || !result.filePaths.length) return null
+  const folder = result.filePaths[0]!
+  assertBackupFolderIsSafe(folder)
+  return folder
+}
 
-  return {
-    folder,
-    health: healthOf(folder, newest, session.lastError),
-    intervalMinutes: settings.backupIntervalMinutes,
-    lastBackupAt: newest?.createdAt ?? null,
-    lastBackupSize: newest?.size ?? 0,
-    count: files.length,
-    oldestBackupAt: oldest?.createdAt ?? null,
-    totalSize: files.reduce((sum, file) => sum + file.size, 0),
-    lastError: session.lastError,
-    freeSpace: folder.trim() === '' ? null : freeSpaceFor(folder)
+export async function openBackupFolder(kind: 'data' | 'local' | 'additional'): Promise<void> {
+  const folder =
+    kind === 'data'
+      ? dirname(databasePath())
+      : kind === 'local'
+        ? localBackupFolder()
+        : getSettings(getDb()).autoBackupDir
+  if (!folder.trim()) throw businessRule('Choose and save an additional backup folder first.')
+  if (kind === 'local') ensureFolder(folder)
+  if (!existsSync(folder))
+    throw businessRule('That folder is unavailable. Connect the drive and try again.')
+  if (!statSync(folder).isDirectory())
+    throw businessRule('That location is not a folder. Choose a backup folder in Settings.')
+  const error = await shell.openPath(resolve(folder))
+  if (error) throw businessRule(`The folder could not be opened: ${error}`)
+}
+
+/** Inspect a temporary migrated copy, never the live shop or the selected original. */
+export async function checkBackup(path?: string): Promise<BackupCheck> {
+  if (path && !listConfiguredBackups().some((file) => pathKey(file.path) === pathKey(path!))) {
+    throw businessRule('That backup is not in the backup folder any more. Refresh the list.')
+  }
+  if (!path) {
+    const picked = await dialog.showOpenDialog({
+      title: 'Choose a backup to check',
+      properties: ['openFile'],
+      filters: [{ name: 'POS backup', extensions: ['db'] }]
+    })
+    if (picked.canceled || !picked.filePaths.length)
+      throw new AppError('CANCELLED', 'Check cancelled.')
+    path = picked.filePaths[0]!
+  }
+  assertUsableBackup(path)
+  const originalStat = statSync(path)
+  const staged = join(app.getPath('userData'), `pos-check-${randomUUID()}.db`)
+  const source = new Database(path, { readonly: true, fileMustExist: true })
+  try {
+    await source.backup(staged)
+    const candidate = openDatabase(staged)
+    try {
+      migrate(candidate)
+    } finally {
+      candidate.close()
+    }
+    assertUsableBackup(staged)
+    const probe = new Database(staged, { readonly: true, fileMustExist: true })
+    try {
+      const counts = probe
+        .prepare<[], DatabaseInfo['counts']>(
+          `SELECT
+        (SELECT COUNT(*) FROM products) AS products, (SELECT COUNT(*) FROM customers) AS customers,
+        (SELECT COUNT(*) FROM suppliers) AS suppliers, (SELECT COUNT(*) FROM sales) AS sales,
+        (SELECT COUNT(*) FROM purchases) AS purchases`
+        )
+        .get()!
+      const businessName = getSettings(probe).businessName
+      const now = statSync(path)
+      if (now.size === originalStat.size && now.mtimeMs === originalStat.mtimeMs)
+        rememberVerified(path, false)
+      return {
+        path,
+        size: originalStat.size,
+        schemaVersion: currentVersion(probe),
+        counts,
+        businessName,
+        checkedAt: new Date().toISOString()
+      }
+    } finally {
+      probe.close()
+    }
+  } finally {
+    source.close()
+    for (const suffix of ['', '-wal', '-shm']) {
+      try {
+        rmSync(`${staged}${suffix}`, { force: true })
+      } catch {
+        log.warn('could not remove temporary check file')
+      }
+    }
   }
 }
 
@@ -625,15 +828,14 @@ export async function restoreFromFile(): Promise<RestoreResult> {
 }
 
 /**
- * Restore one of the backups listed from the configured folder.
+ * Restore one of the backups listed from either recovery destination.
  *
  * The path comes from the renderer, so it is checked against the folder's own
  * listing rather than trusted — the only restorable files are ones this
  * process just enumerated.
  */
 export async function restoreFromPath(path: string): Promise<RestoreResult> {
-  const { autoBackupDir } = getSettings(getDb())
-  const known = listBackups(autoBackupDir).some((file) => resolve(file.path) === resolve(path))
+  const known = listConfiguredBackups().some((file) => pathKey(file.path) === pathKey(path))
 
   if (!known) {
     throw businessRule('That backup is not in the backup folder any more. Refresh the list.')
@@ -673,27 +875,34 @@ export function databaseInfo(): DatabaseInfo {
 }
 
 /**
- * Runs on quit and after a crash, when the owner has configured a folder.
+ * Runs during shutdown, including handled crashes, for both recovery destinations.
  *
  * Synchronous by necessity: `before-quit` does not wait for a promise, so the
  * online backup used everywhere else would never finish. Nothing is writing at
  * this point, which is exactly when a plain file copy is the right tool.
- * Failures are logged, never surfaced — nothing should be able to stop the app
- * from closing.
+ * Failures are recorded for the next launch and logged; they do not stop closing.
  */
 export function runAutoBackup(): void {
+  if (isBusy()) return
+  let targets: ReturnType<typeof destinations>
   try {
-    const { autoBackupDir } = getSettings(getDb())
-    if (!autoBackupDir.trim()) return
-    copyDatabaseTo(autoBackupDir)
-    pruneBackups(autoBackupDir)
-    session.lastBackupAt = Date.now()
-    session.lastError = null
+    targets = destinations()
   } catch (error) {
-    // Recorded as well as logged. The app is closing, so there is nobody to
-    // show an error to now — but the next launch must be able to say that the
-    // last backup did not happen, rather than looking healthy.
-    session.lastError = error instanceof Error ? error.message : String(error)
-    log.error('auto-backup failed', error)
+    log.warn('could not read backup settings during shutdown', error)
+    return
+  }
+  // Local always runs first. A disconnected additional destination cannot prevent it.
+  for (const target of targets) {
+    try {
+      const entry = currentSession(target.folder)
+      if (entry && existsSync(entry.path) && entry.changeCountAtLastBackup === changeCount())
+        continue
+      copyDatabaseTo(target.folder, true)
+      rememberAttempt(target.folder, null)
+      pruneBackups(target.folder)
+    } catch (error) {
+      rememberAttempt(target.folder, error instanceof Error ? error.message : String(error))
+      log.error('auto-backup failed', error)
+    }
   }
 }

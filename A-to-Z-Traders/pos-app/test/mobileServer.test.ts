@@ -97,6 +97,9 @@ describe('what the network can reach (fail-closed)', () => {
     expect(isMobileChannel(IPC_CHANNELS.exportCsv)).toBe(false)
     expect(isMobileChannel(IPC_CHANNELS.backupNow)).toBe(false)
     expect(isMobileChannel(IPC_CHANNELS.backupRestore)).toBe(false)
+    expect(isMobileChannel(IPC_CHANNELS.backupChooseFolder)).toBe(false)
+    expect(isMobileChannel(IPC_CHANNELS.backupOpenFolder)).toBe(false)
+    expect(isMobileChannel(IPC_CHANNELS.backupCheck)).toBe(false)
     expect(isMobileChannel(IPC_CHANNELS.productsImportPreview)).toBe(false)
   })
 
