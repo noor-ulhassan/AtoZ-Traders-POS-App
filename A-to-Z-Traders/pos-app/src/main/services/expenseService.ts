@@ -8,6 +8,7 @@ import type {
   PageWithTotals
 } from '@shared/types'
 import { today } from '@shared/date'
+import { money } from '@shared/money'
 import { getDb } from '../db/connection'
 import * as expenses from '../repositories/expenseRepository'
 import { businessRule, notFound } from '../utils/errors'
@@ -37,12 +38,13 @@ function assertCategoryExists(id: Id | null | undefined): Id | null {
 
 export function addExpense(input: ExpenseInput): Expense {
   const db = getDb()
-  if (input.amount <= 0) throw businessRule('An expense must be greater than zero.')
+  const amount = money(input.amount)
+  if (amount <= 0) throw businessRule('An expense must be greater than zero.')
 
   const id = expenses.insertExpense(db, {
     categoryId: assertCategoryExists(input.categoryId),
     title: input.title,
-    amount: input.amount,
+    amount,
     date: input.date ?? today(),
     notes: input.notes ?? null
   })
@@ -52,12 +54,13 @@ export function addExpense(input: ExpenseInput): Expense {
 export function updateExpense(id: Id, input: ExpenseInput): Expense {
   const db = getDb()
   if (!expenses.findExpense(db, id)) throw notFound('Expense')
-  if (input.amount <= 0) throw businessRule('An expense must be greater than zero.')
+  const amount = money(input.amount)
+  if (amount <= 0) throw businessRule('An expense must be greater than zero.')
 
   expenses.updateExpense(db, id, {
     categoryId: assertCategoryExists(input.categoryId),
     title: input.title,
-    amount: input.amount,
+    amount,
     date: input.date ?? today(),
     notes: input.notes ?? null
   })

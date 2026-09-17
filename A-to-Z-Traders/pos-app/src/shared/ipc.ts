@@ -7,6 +7,7 @@ import type {
   BackupFile,
   BackupResult,
   BackupStatus,
+  BackupCheck,
   Category,
   Customer,
   DashboardSummary,
@@ -208,6 +209,9 @@ export const IPC_CHANNELS = {
   demoClear: 'demo:clear',
   backupStatus: 'backup:status',
   backupList: 'backup:list',
+  backupChooseFolder: 'backup:chooseFolder',
+  backupOpenFolder: 'backup:openFolder',
+  backupCheck: 'backup:check',
 
   mobileStatus: 'mobile:status',
   mobileSignOut: 'mobile:signOut',
@@ -385,7 +389,7 @@ export interface PosApi {
   backup: {
     /** Pick a folder and save one copy there — a USB stick, say. */
     now(): Result<BackupResult>
-    /** Back up to the configured folder immediately, without a dialog. */
+    /** Create local and configured additional copies immediately, without a dialog. */
     runNow(): Result<BackupResult>
     /** Pick any backup file on this machine and restore it. */
     restore(): Result<RestoreResult>
@@ -394,8 +398,11 @@ export interface PosApi {
     info(): Result<DatabaseInfo>
     /** Whether backups are actually happening, and how recently. */
     status(): Result<BackupStatus>
-    /** The backups in the configured folder, newest first. */
+    /** Local and additional backup copies, newest first. */
     list(): Result<BackupFile[]>
+    chooseFolder(): Result<string | null>
+    openFolder(kind: 'data' | 'local' | 'additional'): Result<void>
+    check(path?: string): Result<BackupCheck>
   }
 
   /**

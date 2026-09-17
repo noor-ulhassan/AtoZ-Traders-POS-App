@@ -108,7 +108,18 @@ function createMobileServer(): Server {
         'Content-Type': 'text/plain; charset=utf-8'
       })
       response.end('The phone app has not been built into this copy of the program.')
-    })()
+    })().catch((error: unknown) => {
+      log.error('phone request failed', error)
+      if (!response.headersSent) {
+        response.writeHead(500, {
+          ...securityHeaders(false),
+          'Content-Type': 'text/plain; charset=utf-8'
+        })
+        response.end('That request could not be completed. Try again.')
+      } else {
+        response.destroy()
+      }
+    })
   })
 }
 

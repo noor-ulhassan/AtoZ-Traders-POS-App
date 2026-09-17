@@ -2,13 +2,14 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import Database from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { closeDatabase, databasePath, openDatabase, setDb } from '../src/main/db/connection'
 import { migrate } from '../src/main/db/migrate'
 import { createTestDb } from './helpers/database'
 import * as backupService from '../src/main/services/backupService'
 import * as productService from '../src/main/services/productService'
 import * as settingsService from '../src/main/services/settingsService'
+import { historyPath, recordVerifiedBackup } from '../src/main/services/backupHistory'
 
 /**
  * The backup path end to end, against real files in a real folder.
@@ -30,6 +31,8 @@ function makeFolder(): string {
 }
 
 beforeEach(() => {
+  rmSync(backupService.localBackupFolder(), { recursive: true, force: true })
+  rmSync(historyPath(), { force: true })
   createTestDb()
   backupService.resetBackupSession()
   folder = makeFolder()
@@ -55,6 +58,23 @@ afterEach(() => {
 })
 
 describe('taking a backup while the app is running', () => {
+  it('preserves separate backups requested together in the same second', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-15T12:00:00'))
+    try {
+      const copies = await Promise.all([
+        backupService.onlineBackupTo(folder),
+        backupService.onlineBackupTo(folder)
+      ])
+      expect(new Set(copies.map((copy) => copy.path)).size).toBe(2)
+      expect(backupService.listBackups(folder)).toHaveLength(2)
+      for (const copy of copies)
+        expect(() => backupService.assertUsableBackup(copy.path)).not.toThrow()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('writes a file that opens as a working database', async () => {
     const result = await backupService.onlineBackupTo(folder)
 
@@ -127,7 +147,7 @@ describe('the folder guard', () => {
     expect(settingsService.getSettings().autoBackupDir).toBe('')
   })
 
-  it('still allows turning backups off', () => {
+  it('allows disabling the additional destination', () => {
     expect(() => settingsService.updateSettings({ autoBackupDir: '' })).not.toThrow()
   })
 })
@@ -174,6 +194,7 @@ describe('pruning', () => {
       const stamp = `202607${String(day).padStart(2, '0')}`
       if (day > 31) continue
       writeFileSync(join(folder, `pos-backup-${stamp}-120000.db`), 'x')
+      recordVerifiedBackup(join(folder, `pos-backup-${stamp}-120000.db`), true)
     }
 
     const before = backupService.listBackups(folder).length
@@ -181,6 +202,7 @@ describe('pruning', () => {
     const after = backupService.listBackups(folder).length
 
     expect(before).toBe(31)
+    expect(deleted).toBeGreaterThan(0)
     expect(after).toBe(before - deleted)
     // The newest is never a candidate for removal.
     expect(backupService.listBackups(folder)[0]?.fileName).toBe('pos-backup-20260731-120000.db')
@@ -197,8 +219,10 @@ describe('pruning', () => {
 })
 
 describe('the scheduled backup', () => {
-  it('does nothing at all until a folder is configured', async () => {
-    expect(await backupService.runScheduledBackup()).toBeNull()
+  it('creates local recovery without an additional folder', async () => {
+    const result = await backupService.runScheduledBackup()
+    expect(dirname(result!.path)).toBe(backupService.localBackupFolder())
+    expect(backupService.backupStatus().local.lastVerifiedAt).toBeTruthy()
   })
 
   it('writes into the configured folder and records that it worked', async () => {
@@ -223,18 +247,22 @@ describe('the scheduled backup', () => {
     writeFileSync(blocked, 'not a folder')
     settingsService.updateSettings({ autoBackupDir: join(blocked, 'inside') })
 
-    await expect(backupService.runScheduledBackup()).resolves.toBeNull()
+    await expect(backupService.runScheduledBackup()).resolves.toHaveProperty('path')
 
     const status = backupService.backupStatus()
     expect(status.health).toBe('failing')
     expect(status.lastError).toBeTruthy()
+    expect(status.local.health).toBe('ok')
+    backupService.resetBackupSession()
+    expect(backupService.backupStatus().additional?.lastError).toBeTruthy()
   })
 
-  it('reports "off" when no folder is set', () => {
+  it('reports local recovery waiting for its first backup when no additional folder is set', () => {
     const status = backupService.backupStatus()
-    expect(status.health).toBe('off')
+    expect(status.health).toBe('never')
     expect(status.count).toBe(0)
-    expect(status.freeSpace).toBeNull()
+    expect(status.folder).toBe(backupService.localBackupFolder())
+    expect(status.additional).toBeNull()
   })
 
   it('reports "never" for a configured folder with nothing in it yet', () => {
@@ -353,9 +381,10 @@ describe('the on-quit copy', () => {
     }
   })
 
-  it('is a no-op when no folder is configured', () => {
+  it('writes local recovery on quit without an additional folder', () => {
     expect(() => backupService.runAutoBackup()).not.toThrow()
     expect(backupService.listBackups(folder)).toHaveLength(0)
+    expect(backupService.listBackups(backupService.localBackupFolder())).toHaveLength(1)
   })
 
   it('writes and prunes when a folder is configured', () => {

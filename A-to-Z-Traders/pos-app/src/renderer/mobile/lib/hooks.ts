@@ -154,12 +154,16 @@ export function useAction<Args extends unknown[], T>(
   action: (...args: Args) => Promise<T>,
   options: { onSuccess?: (result: T) => void } = {}
 ): ActionResult<Args, T> {
+  const inFlight = useRef(false)
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fields, setFields] = useState<Record<string, string>>({})
 
   const run = useCallback(
     async (...args: Args): Promise<T | undefined> => {
+      // A fast repeat tap can arrive before React disables the button.
+      if (inFlight.current) return undefined
+      inFlight.current = true
       setIsPending(true)
       setError(null)
       setFields({})
@@ -176,6 +180,7 @@ export function useAction<Args extends unknown[], T>(
         }
         return undefined
       } finally {
+        inFlight.current = false
         setIsPending(false)
       }
     },

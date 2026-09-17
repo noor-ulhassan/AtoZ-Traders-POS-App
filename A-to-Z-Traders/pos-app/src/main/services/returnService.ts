@@ -14,6 +14,7 @@ import { today } from '@shared/date'
 import { money, qty, sumMoney } from '@shared/money'
 import { getDb } from '../db/connection'
 import * as parties from '../repositories/partyRepository'
+import * as purchases from '../repositories/purchaseRepository'
 import * as returns from '../repositories/returnRepository'
 import * as sales from '../repositories/saleRepository'
 import { businessRule, notFound } from '../utils/errors'
@@ -90,6 +91,11 @@ export function createSaleReturn(input: SaleReturnInput): SaleReturnWithItems {
     const unit = resolveUnit(db, product, item.unitName)
     const lineQty = qty(item.qty)
     const baseQty = qty(lineQty * unit.factor)
+    if (lineQty <= 0 || baseQty <= 0) {
+      throw businessRule(
+        `Quantity for "${product.name}" is too small. It must be more than zero after rounding.`
+      )
+    }
     // Rounded once and used for both the stored rate and the amount, so a
     // credit note adds up on paper. Same rule as a bill line (salesService).
     const rate = money(item.rate)
@@ -218,14 +224,31 @@ export function createPurchaseReturn(input: PurchaseReturnInput): PurchaseReturn
 
   const date = input.date ?? today()
   const purchaseId = input.purchaseId ?? null
-  const supplierId = input.supplierId ?? null
+  let supplierId = input.supplierId ?? null
+  if (purchaseId != null) {
+    const purchase = purchases.findPurchase(db, purchaseId)
+    if (!purchase) throw notFound('Purchase')
+    // Like a sale return, a linked return belongs to the original party.
+    supplierId = purchase.supplierId
+  }
   if (supplierId != null) requireParty(db, 'supplier', supplierId)
 
   const lines = input.items.map((item) => {
     const product = requireProduct(db, item.productId)
+    if (product.ownership === 'other') {
+      throw businessRule(
+        `"${product.name}" belongs to ${product.ownerName}. Return it through Other stock.`
+      )
+    }
     const unit = resolveUnit(db, product, item.unitName)
     const lineQty = qty(item.qty)
     const baseQty = qty(lineQty * unit.factor)
+
+    if (lineQty <= 0 || baseQty <= 0) {
+      throw businessRule(
+        `Quantity for "${product.name}" is too small. It must be more than zero after rounding.`
+      )
+    }
 
     const costPerBase =
       item.unitCost != null ? money(item.unitCost / unit.factor) : product.costPrice

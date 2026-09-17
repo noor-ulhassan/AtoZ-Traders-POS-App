@@ -53,9 +53,10 @@ export function createPurchase(input: PurchaseInput): PurchaseWithItems {
   const lines = input.items.map((item) => {
     const product = requireProduct(db, item.productId)
     const unit = resolveUnit(db, product, item.unitName)
-    const baseQty = qty(item.qty * unit.factor)
+    const lineQty = qty(item.qty)
+    const baseQty = qty(lineQty * unit.factor)
 
-    if (baseQty <= 0) {
+    if (lineQty <= 0 || baseQty <= 0) {
       throw businessRule(`Quantity for "${product.name}" must be more than zero.`)
     }
 
@@ -70,15 +71,16 @@ export function createPurchase(input: PurchaseInput): PurchaseWithItems {
     }
 
     // Cost is entered per chosen unit; the database stores it per base unit.
-    const costPerBase = money(item.unitCost / unit.factor)
+    const unitCost = money(item.unitCost)
+    const costPerBase = money(unitCost / unit.factor)
     return {
       product,
       unitName: unit.unitName,
       factor: unit.factor,
-      qty: qty(item.qty),
+      qty: lineQty,
       baseQty,
       costPerBase,
-      amount: money(item.qty * item.unitCost)
+      amount: money(lineQty * unitCost)
     }
   })
 

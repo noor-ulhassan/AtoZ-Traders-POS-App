@@ -1,17 +1,23 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import * as fs from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { dialog } from 'electron'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { closeDatabase, databasePath, openDatabase, setDb } from '../src/main/db/connection'
+import { closeDatabase, databasePath, getDb, openDatabase, setDb } from '../src/main/db/connection'
+import * as connection from '../src/main/db/connection'
 import { migrate } from '../src/main/db/migrate'
 import { LATEST_VERSION, MIGRATIONS } from '../src/main/db/migrations'
-import { isBusy } from '../src/main/ipc/maintenance'
+import { isBusy, underMaintenance } from '../src/main/ipc/maintenance'
 import * as backupService from '../src/main/services/backupService'
 import * as partyService from '../src/main/services/partyService'
 import * as productService from '../src/main/services/productService'
 import * as salesService from '../src/main/services/salesService'
 import * as settingsService from '../src/main/services/settingsService'
+
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>())
+}))
 
 /**
  * Restoring a backup, all the way through.
@@ -115,6 +121,151 @@ afterEach(() => {
 })
 
 describe('restoring a backup over the live database', () => {
+  it.each(['move live', 'install backup', 'open replacement'] as const)(
+    'keeps current data writable when restore fails at: %s',
+    async (stage) => {
+      const { productId } = trade()
+      const backup = await backupService.backupToConfiguredFolder()
+      const later = partyService.addParty('customer', { name: 'Keep after failed swap' })
+      const originalRename = fs.renameSync
+      const originalOpen = connection.openDatabase
+      let failed = false
+      vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (
+          !failed &&
+          ((stage === 'move live' && from === databasePath()) ||
+            (stage === 'install backup' && to === databasePath()))
+        ) {
+          failed = true
+          throw new Error('simulated file replacement failure')
+        }
+        originalRename(from, to)
+      })
+      vi.spyOn(connection, 'openDatabase').mockImplementation((path) => {
+        if (!failed && stage === 'open replacement' && path === undefined) {
+          failed = true
+          throw new Error('simulated replacement open failure')
+        }
+        return originalOpen(path)
+      })
+
+      confirmTheDialog()
+      await expect(backupService.restoreFromPath(backup.path)).rejects.toThrow(/unchanged/i)
+      expect(failed).toBe(true)
+      expect(partyService.getParty('customer', later.id).name).toBe(later.name)
+      expect(productService.getProduct(productId).stockQty).toBe(30)
+      expect(getDb().pragma('integrity_check', { simple: true })).toBe('ok')
+      expect(getDb().pragma('foreign_key_check')).toEqual([])
+      expect(() => partyService.addParty('customer', { name: 'Still writable' })).not.toThrow()
+      expect(isBusy()).toBe(false)
+    }
+  )
+
+  it('refuses restore during an active backup and permits retry when it completes', async () => {
+    trade()
+    const backup = await backupService.backupToConfiguredFolder()
+    const originalBackup = getDb().backup.bind(getDb())
+    let finish!: () => void
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    vi.spyOn(getDb(), 'backup').mockImplementationOnce(async (path) => {
+      await gate
+      return originalBackup(path)
+    })
+    const pending = backupService.onlineBackupTo(folder)
+    confirmTheDialog()
+    try {
+      await expect(backupService.restoreFromPath(backup.path)).rejects.toThrow(
+        /backup is in progress/i
+      )
+      expect(isBusy()).toBe(false)
+      expect(salesService.listSales().total).toBe(1)
+    } finally {
+      finish()
+      await pending
+    }
+    await expect(backupService.restoreFromPath(backup.path)).resolves.toMatchObject({
+      restoredFrom: backup.path
+    })
+  })
+
+  it('refuses a new online backup while restore maintenance is active', async () => {
+    await underMaintenance(async () => {
+      await expect(backupService.onlineBackupTo(folder)).rejects.toThrow(/restore is in progress/i)
+      expect(backupService.listBackups(folder)).toEqual([])
+    })
+    await expect(backupService.onlineBackupTo(folder)).resolves.toHaveProperty('path')
+  })
+
+  it('restores committed source WAL pages as well as the main backup file', async () => {
+    trade()
+    const backup = await backupService.backupToConfiguredFolder()
+    const source = openDatabase(backup.path)
+    try {
+      source.prepare('INSERT INTO customers (name) VALUES (?)').run('Customer in source WAL')
+      expect(existsSync(`${backup.path}-wal`)).toBe(true)
+      confirmTheDialog()
+      await backupService.restoreFromPath(backup.path)
+      expect(
+        partyService
+          .listParties('customer')
+          .rows.some((row) => row.name === 'Customer in source WAL')
+      ).toBe(true)
+      expect(getDb().pragma('integrity_check', { simple: true })).toBe('ok')
+    } finally {
+      source.close()
+    }
+  })
+
+  it('preserves the live shop and its connection when backup migration fails', async () => {
+    trade()
+    const backup = await backupService.backupToConfiguredFolder()
+    const later = partyService.addParty('customer', { name: 'Arrived after the backup' })
+    const damaged = openDatabase(backup.path)
+    // The schema already has the columns, but its migration record is missing.
+    damaged.prepare('DELETE FROM schema_migrations WHERE version = ?').run(LATEST_VERSION)
+    damaged.close()
+
+    confirmTheDialog()
+    await expect(backupService.restoreFromPath(backup.path)).rejects.toThrow()
+    expect(partyService.getParty('customer', later.id).name).toBe(later.name)
+    expect(backupService.databaseInfo().schemaVersion).toBe(LATEST_VERSION)
+    expect(() => partyService.addParty('customer', { name: 'Still trading' })).not.toThrow()
+    expect(isBusy()).toBe(false)
+  })
+
+  it('refuses a backup from a newer application without replacing current data', async () => {
+    trade()
+    const backup = await backupService.backupToConfiguredFolder()
+    const newer = openDatabase(backup.path)
+    newer
+      .prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)')
+      .run(LATEST_VERSION + 1, 'future-version')
+    newer.close()
+    const later = partyService.addParty('customer', { name: 'Keep this customer' })
+
+    confirmTheDialog()
+    await expect(backupService.restoreFromPath(backup.path)).rejects.toThrow(/newer|version/i)
+    expect(partyService.getParty('customer', later.id).name).toBe(later.name)
+    expect(isBusy()).toBe(false)
+  })
+
+  it('refuses broken foreign keys before replacing the live shop', async () => {
+    trade()
+    const backup = await backupService.backupToConfiguredFolder()
+    const broken = openDatabase(backup.path)
+    broken.pragma('foreign_keys = OFF')
+    broken.prepare('UPDATE sale_items SET product_id = 999999').run()
+    broken.close()
+    const later = partyService.addParty('customer', { name: 'Keep this customer' })
+
+    confirmTheDialog()
+    await expect(backupService.restoreFromPath(backup.path)).rejects.toThrow()
+    expect(partyService.getParty('customer', later.id).name).toBe(later.name)
+    expect(isBusy()).toBe(false)
+  })
+
   it('puts the shop back exactly as the backup left it', async () => {
     const { productId, customerId } = trade()
     const backup = await backupService.backupToConfiguredFolder()

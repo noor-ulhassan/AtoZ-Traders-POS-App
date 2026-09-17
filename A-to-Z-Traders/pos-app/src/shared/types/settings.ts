@@ -12,14 +12,12 @@ export interface Settings {
   logoPath: string
   currency: string
   /**
-   * Where automatic backups are written. Empty turns them off.
-   *
-   * Point this at a folder a cloud client syncs (Google Drive, OneDrive) and
-   * the shop's records survive the machine itself. Never point it at the folder
-   * holding the live database — the app refuses that.
+   * Optional additional backup destination. Empty keeps local recovery enabled.
+   * A separate device or synced folder can provide another recovery location;
+   * a successful local write does not confirm that a cloud upload completed.
    */
   autoBackupDir: string
-  /** Minutes between automatic backups. 0 = only when the app closes. */
+  /** Minutes between additional copies. 0 = only when the app closes. */
   backupIntervalMinutes: number
 
   /**

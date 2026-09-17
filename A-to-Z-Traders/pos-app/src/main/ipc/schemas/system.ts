@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+export const backupFolderSchema = z.object({ kind: z.enum(['data', 'local', 'additional']) })
+export const backupCheckSchema = z.object({ path: z.string().trim().min(1).max(1000).optional() })
+
 /** Restore names a file the main process itself listed; it re-checks that. */
 export const backupPathSchema = z.object({
   path: z.string().trim().min(1).max(1000)

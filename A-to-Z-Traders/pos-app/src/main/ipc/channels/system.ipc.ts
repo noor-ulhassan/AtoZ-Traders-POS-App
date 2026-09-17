@@ -5,12 +5,26 @@ import * as salesService from '../../services/salesService'
 import { printReceipt } from '../../printing/printer'
 import { logger } from '../../utils/logger'
 import { noInput, registerHandler } from '../registry'
-import { backupPathSchema, logErrorSchema } from '../schemas/system'
+import {
+  backupPathSchema,
+  backupFolderSchema,
+  backupCheckSchema,
+  logErrorSchema
+} from '../schemas/system'
 import { saleIdSchema } from '../schemas/trade'
 
 const rendererLog = logger.child('renderer')
 
 export function registerSystemHandlers(): void {
+  registerHandler(IPC_CHANNELS.backupChooseFolder, noInput, () =>
+    backupService.chooseBackupFolder()
+  )
+  registerHandler(IPC_CHANNELS.backupOpenFolder, backupFolderSchema, ({ kind }) =>
+    backupService.openBackupFolder(kind)
+  )
+  registerHandler(IPC_CHANNELS.backupCheck, backupCheckSchema, ({ path }) =>
+    backupService.checkBackup(path)
+  )
   registerHandler(IPC_CHANNELS.backupNow, noInput, () => backupService.backupNow())
   registerHandler(IPC_CHANNELS.backupRunNow, noInput, () =>
     backupService.backupToConfiguredFolder()

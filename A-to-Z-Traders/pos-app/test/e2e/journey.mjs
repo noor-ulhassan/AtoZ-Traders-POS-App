@@ -7,6 +7,7 @@
  */
 import { launch, collectProblems, makeEval, freshDir, sleep } from './driver.mjs'
 import { INSTALL } from './ui.mjs'
+import { writeFileSync } from 'node:fs'
 
 import { APP, userDataDir } from './paths.mjs'
 
@@ -653,7 +654,7 @@ await check('tax turns on and every figure moves with it', async () => {
   return 'tax applied, receipt agrees'
 })
 
-await check('a double-click on Save writes one bill, not two', async () => {
+await check('independent simultaneous sales receive distinct invoice numbers', async () => {
   const before = await api('sales.list', { limit: 1000 })
   const fired = await session.evaluate(async (productId) => {
     const payload = {
@@ -661,7 +662,7 @@ await check('a double-click on Save writes one bill, not two', async () => {
       paymentType: 'cash',
       paidAmount: 1450
     }
-    // Both requests leave before either answer arrives - a real double-click.
+    // Two independent API requests are two sales; UI repeat protection is checked below.
     const [a, b] = await Promise.all([
       window.api.sales.create(payload),
       window.api.sales.create(payload)
@@ -669,9 +670,43 @@ await check('a double-click on Save writes one bill, not two', async () => {
     return [a.ok, b.ok]
   }, ids.oil.id)
   const after = await api('sales.list', { limit: 1000 })
+  eq(fired.filter(Boolean).length, 2, 'accepted independent sales')
+  eq(after.total - before.total, 2, 'saved independent sales')
   const invoices = after.rows.map((r) => r.invoiceNo)
   eq(new Set(invoices).size, invoices.length, 'two bills share an invoice number')
   return `${after.total - before.total} bill(s) from ${fired.filter(Boolean).length} accepted requests`
+})
+
+await check('rapid clicks on the billing Save button write exactly one bill', async () => {
+  const before = await api('sales.list')
+  const stockBefore = await api('products.get', ids.oil.id)
+  await goto('#/billing')
+  await ui(() => window.__t.fillSelector('input[placeholder*="Scan a barcode" i]', 'Cooking'))
+  await sleep(900)
+  await ui(() => {
+    const option = Array.from(document.querySelectorAll('[role=option], li, button')).find(
+      (el) => (el.textContent || '').includes('Cooking oil 5L') && el.offsetParent !== null
+    )
+    if (!option) throw new Error('the product search showed no match')
+    option.click()
+  })
+  await sleep(700)
+  await ui(() => {
+    const save = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent.includes('Save bill') && el.offsetParent !== null
+    )
+    if (!save || save.disabled) throw new Error('the Save bill button is not ready')
+    save.click()
+    save.click()
+    save.click()
+  })
+  assert(await ui(async () => await window.__t.waitFor('Invoice', 10000)), 'no saved receipt')
+  const after = await api('sales.list')
+  eq(after.total - before.total, 1, 'bills saved by rapid button clicks')
+  const stockAfter = await api('products.get', ids.oil.id)
+  eq(stockAfter.stockQty, stockBefore.stockQty - 1, 'stock deducted exactly once')
+  await goto('#/sales')
+  return 'three rapid clicks, one bill and one stock deduction'
 })
 
 await check('the sample data can be seeded and removed without touching real records', async () => {
@@ -853,6 +888,76 @@ await check('the backup status tells the owner where things stand', async () => 
 })
 
 // -------------------------------------------------------------- restart
+
+await check('both backup destinations contain checked copies', async () => {
+  const status = await api('backup.status')
+  assert(status.local.lastVerifiedAt, 'local copy has no verification')
+  assert(status.additional?.lastVerifiedAt, 'additional copy has no verification')
+  const list = await api('backup.list')
+  assert(
+    list.some((file) => file.location === 'local' && file.verifiedAt),
+    'local copy missing'
+  )
+  assert(
+    list.some((file) => file.location === 'additional' && file.verifiedAt),
+    'additional copy missing'
+  )
+  return 'local and additional snapshots verified'
+})
+
+await check('Settings makes backup locations and actions discoverable', async () => {
+  await session.cdp.send('Page.reload')
+  await sleep(1200)
+  await session.cdp.send('Runtime.evaluate', { expression: INSTALL })
+  await goto('#/settings')
+  const arrived = await ui(async () => await window.__t.waitFor('Data & backups', 10000))
+  assert(arrived, 'backup settings did not load')
+  const text = await ui(() => document.body.innerText)
+  for (const label of [
+    'Local recovery',
+    'Additional copy',
+    'Browse',
+    'Open local backups',
+    'Open data folder',
+    'Check a backup file'
+  ]) {
+    assert(text.includes(label), `missing backup control: ${label}`)
+  }
+  assert(!/Invalid Date|NaN/.test(text), 'backup timestamps are not readable')
+  assert(
+    await ui(
+      (folder) => [...document.querySelectorAll('input')].some((input) => input.value === folder),
+      BACKUPS
+    ),
+    'saved folder not shown'
+  )
+  return 'folders and backup controls visible'
+})
+
+await check('a backup can be inspected in Settings without replacing shop records', async () => {
+  const before = await api('sales.list', { limit: 1000 })
+  await ui(() => window.__t.click('Check backup'))
+  assert(
+    await ui(async () => await window.__t.waitFor('Backup check passed', 10000)),
+    'backup check result not shown'
+  )
+  const after = await api('sales.list', { limit: 1000 })
+  eq(after.total, before.total, 'live bill count after checking backup')
+  eq(after.totals.total, before.totals.total, 'live sales amount after checking backup')
+  assert(
+    await ui(() => document.documentElement.scrollWidth <= window.innerWidth),
+    'Settings overflows horizontally'
+  )
+  await ui(() =>
+    [...document.querySelectorAll('h1,h2,h3')]
+      .find((heading) => heading.textContent === 'Data & backups')
+      ?.scrollIntoView()
+  )
+  const screenshot = await session.cdp.send('Page.captureScreenshot', { format: 'png' })
+  const screenshotPath = userDataDir('backup-settings.png')
+  writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'))
+  return `check passed; screenshot: ${screenshotPath}`
+})
 
 phase('quit and reopen')
 

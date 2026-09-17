@@ -77,6 +77,9 @@ export function adjustStock(input: StockAdjustmentInput): { productId: Id; stock
   const db = getDb()
   const product = requireProduct(db, input.productId)
   const change = qty(input.changeQty)
+  if (change === 0) {
+    throw businessRule('Quantity change cannot be zero after rounding.')
+  }
 
   const resulting = qty(product.stockQty + change)
   if (resulting < 0) {
