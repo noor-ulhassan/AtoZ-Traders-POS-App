@@ -16,3 +16,4 @@ graph.html
 # which is itself ignored). Remove this line if you ever add real attributes.
 .gitattributes
 HANDOFF.md
+PLAN.md
