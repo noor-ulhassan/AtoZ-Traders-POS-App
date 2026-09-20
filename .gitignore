@@ -1,6 +1,8 @@
 # Claude Code local config
 .claude
 CLAUDE.md
+/.codex/
+/.agents/
 
 # Graphify knowledge graph — local-only, regenerated from source.
 # Nothing here belongs on GitHub; the graph is rebuilt from code on demand.
